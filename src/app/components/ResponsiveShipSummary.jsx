@@ -58,6 +58,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
     const distBoost = canBoost ? Calc.calcBoost(ship) : 'No Boost';
     const restingHeat = Math.sqrt(((ship.standard[0].m.pgen * ship.standard[0].m.eff) / ship.heatCapacity) / 0.2);
     const armourMetrics = Calc.armourMetrics(ship);
+    const hasWeapons = ship.hasHadrdpointMounted();
 
     // Heat stats
     const ppEfficiency = ship.standard[0].m.getThermalEfficiency(); // Power Plant efficiency rate
@@ -72,19 +73,6 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
       hardpoints: ship.getHardpointsThermalLoad(pips.wep),
       scb: scbStats.thermalLoad,
     };
-
-    const hasWeapons = ship.hasHadrdpointMounted();
-    const hasSbcs = ship.hasShieldCellBanksMounted();
-
-    const formatHeat = function(heatLevel) {
-      if (heatLevel.type === 'string') {
-        return heatLevel.result;
-      } else if (heatLevel.type === 'percentage') {
-        return formats.pct(heatLevel.result);
-      }
-      return formats.time(heatLevel.result) + "s";
-    };
-
     const heat_idle = ship.getHeatLevel(thermalLoad.all.retracted, 0);
     const heat_maxThrust = ship.getHeatLevel(thermalLoad.thrusters, thermalLoad.all.retracted);
     const heat_maxThrustFsdCharging = ship.getHeatLevel(thermalLoad.fsd, thermalLoad.all.retracted + thermalLoad.thrusters);
@@ -536,7 +524,12 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                     className='value'
                     onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_IDLE', { cap: 0 })}
                     onMouseLeave={hide}
-                  >{formatHeat(heat_idle)}</td>
+                  ><span className={heat_idle.className}>{
+                    heat_idle.type === 'string'
+                      ? heat_idle.result
+                      : heat_idle.type === 'percentage'
+                        ? formats.pct(heat_idle.result)
+                        : formats.time(heat_idle.result)}{heat_idle.type === 'time' ? u.s : null}</span></td>
                 </tr>
                 <tr>
                   <td className='label'>
@@ -612,7 +605,12 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   className='value'
                   onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST', { cap: 0 })}
                   onMouseLeave={hide}
-                >{formatHeat(heat_maxThrust)}</td>
+                ><span className={heat_maxThrust.className}>{
+                  heat_maxThrust.type === 'string'
+                    ? heat_maxThrust.result
+                    : heat_maxThrust.type === 'percentage'
+                      ? formats.pct(heat_maxThrust.result)
+                      : formats.time(heat_maxThrust.result)}{heat_maxThrust.type === 'time' ? u.s : null}</span></td>
               </tr>
               <tr>
                 <td className='label'>
@@ -623,7 +621,12 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   className='value'
                   onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_FSD', { cap: 0 })}
                   onMouseLeave={hide}
-                >{formatHeat(heat_maxThrustFsdCharging)}</td>
+                ><span className={heat_maxThrustFsdCharging.className}>{
+                  heat_maxThrustFsdCharging.type === 'string'
+                    ? heat_maxThrustFsdCharging.result
+                    : heat_maxThrustFsdCharging.type === 'percentage'
+                      ? formats.pct(heat_maxThrustFsdCharging.result)
+                      : formats.time(heat_maxThrustFsdCharging.result)}{heat_maxThrustFsdCharging.type === 'time' ? u.s : null}</span></td>
               </tr>
               <tr>
                 <td className='label'>
@@ -634,7 +637,12 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   className='value'
                   onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_FULL_CAP', { cap: 0 })}
                   onMouseLeave={hide}
-                >{hasWeapons ? formatHeat(heat_allWeaponsFiring_capacitorFull) + " *" : '-'}</td>
+                ><span className={heat_allWeaponsFiring_capacitorFull.className}>{
+                  heat_allWeaponsFiring_capacitorFull.type === 'string'
+                    ? heat_allWeaponsFiring_capacitorFull.result
+                    : heat_allWeaponsFiring_capacitorFull.type === 'percentage'
+                      ? formats.pct(heat_allWeaponsFiring_capacitorFull.result)
+                      : formats.time(heat_allWeaponsFiring_capacitorFull.result)}{heat_allWeaponsFiring_capacitorFull.type === 'time' ? u.s : null}{hasWeapons?'*':null}</span></td>
               </tr>
               <tr>
                 <td className='label'>
@@ -645,7 +653,12 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   className='value'
                   onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_EMPTY_CAP', { cap: 0 })}
                   onMouseLeave={hide}
-                >{hasWeapons ? formatHeat(heat_allWeaponsFiring_capacitorNearEmpty) + " *" : '-'}</td>
+                ><span className={heat_allWeaponsFiring_capacitorNearEmpty.className}>{
+                  heat_allWeaponsFiring_capacitorNearEmpty.type === 'string'
+                    ? heat_allWeaponsFiring_capacitorNearEmpty.result
+                    : heat_allWeaponsFiring_capacitorNearEmpty.type === 'percentage'
+                      ? formats.pct(heat_allWeaponsFiring_capacitorNearEmpty.result)
+                      : formats.time(heat_allWeaponsFiring_capacitorNearEmpty.result)}{heat_allWeaponsFiring_capacitorNearEmpty.type === 'time' ? u.s : null}{hasWeapons?'*':null}</span></td>
               </tr>
               <tr>
                 <td className='label'>
@@ -656,7 +669,12 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   className='value'
                   onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_SCBS', { cap: 0 })}
                   onMouseLeave={hide}
-                >{hasSbcs ? formatHeat(heat_maxThrustSbcFiring) : '-'}</td>
+                ><span className={heat_maxThrustSbcFiring.className}>{
+                  heat_maxThrustSbcFiring.type === 'string'
+                    ? heat_maxThrustSbcFiring.result
+                    : heat_maxThrustSbcFiring.type === 'percentage'
+                      ? formats.pct(heat_maxThrustSbcFiring.result)
+                      : formats.time(heat_maxThrustSbcFiring.result)}{heat_maxThrustSbcFiring.type === 'time' ? u.s : null}</span></td>
               </tr>
               </tbody>
             </table>
