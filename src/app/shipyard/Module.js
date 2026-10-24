@@ -1048,9 +1048,9 @@ export default class Module {
     const burst = this.get('burst', modified) || 1;
     const burstRoF = this.get('burstrof', modified) || 1;
     const intRoF = this.get('rof', modified);
-    const charge = this.get('charge', modified) || 0;
+    const chargetime = this.get('chargetime', modified) || 0;
 
-    return burst / (((burst - 1) / burstRoF) + 1 / intRoF + charge);
+    return burst / (((burst - 1) / burstRoF) + 1 / intRoF + chargetime);
   }
 
   /**
@@ -1240,7 +1240,7 @@ export default class Module {
     const burstRateOfFire = this.get('burstrof') || 1; // Burst Rate of Fire
 
     let chargeTime = this.get('chargetime') || 0; // Time to reach maximum charge (in seconds)
-    chargeTime *= (this.get('damageMultiplier') ? 0 : 1);
+    chargeTime *= (this.get('damagemultiplier') ? 0 : 1);
     if (this.name === 'Imperial Hammer') { // TODO: bug? Imperial Hammer Rail Gun can keep firing through reloads without re-charging
       chargeTime = 0;
     }
