@@ -56,7 +56,6 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
     const canJump = ship.getSlotStatus(ship.standard[2]) == 3;
     const sgMetrics = Calc.shieldMetrics(ship, pips.sys);
     const distBoost = canBoost ? Calc.calcBoost(ship) : 'No Boost';
-    const restingHeat = Math.sqrt(((ship.standard[0].m.pgen * ship.standard[0].m.eff) / ship.heatCapacity) / 0.2);
     const armourMetrics = Calc.armourMetrics(ship);
     const hasWeapons = ship.hasHadrdpointMounted();
 
