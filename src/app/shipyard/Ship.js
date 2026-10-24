@@ -2433,7 +2433,7 @@ export default class Ship {
         type: 'string',
         result: '-',
         className: 'primary',
-        tooltip: 'PHRASE_HEAT_NO_WEAPON_PIPS',
+        tooltip: 'PHRASE_HEAT_MODULE_UNAVAILBLE',
       }
     }
 

@@ -107,7 +107,7 @@
     "TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_FULL_CAP": "Heat with thrusters at maximum and all weapons firing, with full capacitor",
     "TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_EMPTY_CAP": "Heat with thrusters at maximum and all weapons firing, with near-empty capacitor",
     "TT_SUMMARY_HEAT_MAX_THRUST_AND_SCBS": "Heat with thrusters at maximum and SCBs spinning up",
-    "PHRASE_HEAT_NO_WEAPON_PIPS": "No pips set to weapons?",
+    "PHRASE_HEAT_MODULE_UNAVAILBLE": "Module unavailable",
     "PHRASE_HEAT_BASE_OVERLOAD": "Base thermal load is larger than the maximum heat dissipation; the ship will overheat all by itself.",
     "PHRASE_HEAT_BASE_STABLE": "Base thermal load is stable",
     "PHRASE_HEAT_TIME_UNTIL_OVERHEAT": "Time until overheating",

@@ -515,13 +515,17 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
               </colgroup>
               <tbody>
                 <tr>
-                  <td className='label'>
+                  <td
+                    className='label'
+                    onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_IDLE', { cap: 0 })}
+                    onMouseLeave={hide}
+                  >
                     <span className='label-full'>{translate('HEAT (IDLE)')}</span>
                     <span className='label-abbr'>{translate('HEAT (IDLE)')}</span>
                   </td>
                   <td
                     className='value'
-                    onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_IDLE', { cap: 0 })}
+                    onMouseEnter={termtip.bind(null, heat_idle.tooltip, { cap: 0 })}
                     onMouseLeave={hide}
                   ><span className={heat_idle.className}>{
                     heat_idle.type === 'string'
@@ -596,13 +600,17 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
               </colgroup>
               <tbody>
               <tr>
-                <td className='label'>
+                <td
+                  className='label'
+                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST', { cap: 0 })}
+                  onMouseLeave={hide}
+                >
                   <span className='label-full'>{translate('MAX THRUST')}</span>
                   <span className='label-abbr'>{translate('MAX THRUST')}</span>
                 </td>
                 <td
                   className='value'
-                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST', { cap: 0 })}
+                  onMouseEnter={termtip.bind(null, heat_maxThrust.tooltip, { cap: 0 })}
                   onMouseLeave={hide}
                 ><span className={heat_maxThrust.className}>{
                   heat_maxThrust.type === 'string'
@@ -612,13 +620,17 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                       : formats.time(heat_maxThrust.result)}{heat_maxThrust.type === 'time' ? u.s : null}</span></td>
               </tr>
               <tr>
-                <td className='label'>
+                <td
+                  className='label'
+                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_FSD', { cap: 0 })}
+                  onMouseLeave={hide}
+                >
                   <span className='label-full'>{translate('THRUST+FSD')}</span>
                   <span className='label-abbr'>{translate('THRUST+FSD')}</span>
                 </td>
                 <td
                   className='value'
-                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_FSD', { cap: 0 })}
+                  onMouseEnter={termtip.bind(null, heat_maxThrustFsdCharging.tooltip, { cap: 0 })}
                   onMouseLeave={hide}
                 ><span className={heat_maxThrustFsdCharging.className}>{
                   heat_maxThrustFsdCharging.type === 'string'
@@ -628,13 +640,17 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                       : formats.time(heat_maxThrustFsdCharging.result)}{heat_maxThrustFsdCharging.type === 'time' ? u.s : null}</span></td>
               </tr>
               <tr>
-                <td className='label'>
+                <td
+                  className='label'
+                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_FULL_CAP', { cap: 0 })}
+                  onMouseLeave={hide}
+                >
                   <span className='label-full'>{translate('THRUST+WPN')}</span>
                   <span className='label-abbr'>{translate('THRUST+WPN')}</span>
                 </td>
                 <td
                   className='value'
-                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_FULL_CAP', { cap: 0 })}
+                  onMouseEnter={termtip.bind(null, heat_allWeaponsFiring_capacitorFull.tooltip, { cap: 0 })}
                   onMouseLeave={hide}
                 ><span className={heat_allWeaponsFiring_capacitorFull.className}>{
                   heat_allWeaponsFiring_capacitorFull.type === 'string'
@@ -644,13 +660,17 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                       : formats.time(heat_allWeaponsFiring_capacitorFull.result)}{heat_allWeaponsFiring_capacitorFull.type === 'time' ? u.s : null}{hasWeapons?'*':null}</span></td>
               </tr>
               <tr>
-                <td className='label'>
+                <td
+                  className='label'
+                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_EMPTY_CAP', { cap: 0 })}
+                  onMouseLeave={hide}
+                >
                   <span className='label-full'>{translate('THRUST+WPN')}</span>
                   <span className='label-abbr'>{translate('THRUST+WPN')}</span>
                 </td>
                 <td
                   className='value'
-                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_EMPTY_CAP', { cap: 0 })}
+                  onMouseEnter={termtip.bind(null, heat_allWeaponsFiring_capacitorNearEmpty.tooltip, { cap: 0 })}
                   onMouseLeave={hide}
                 ><span className={heat_allWeaponsFiring_capacitorNearEmpty.className}>{
                   heat_allWeaponsFiring_capacitorNearEmpty.type === 'string'
@@ -660,13 +680,17 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                       : formats.time(heat_allWeaponsFiring_capacitorNearEmpty.result)}{heat_allWeaponsFiring_capacitorNearEmpty.type === 'time' ? u.s : null}{hasWeapons?'*':null}</span></td>
               </tr>
               <tr>
-                <td className='label'>
+                <td
+                  className='label'
+                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_SCBS', { cap: 0 })}
+                  onMouseLeave={hide}
+                >
                   <span className='label-full'>{translate('THRUST+SCB')}</span>
                   <span className='label-abbr'>{translate('THRUST+SCB')}</span>
                 </td>
                 <td
                   className='value'
-                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_SCBS', { cap: 0 })}
+                  onMouseEnter={termtip.bind(null, heat_maxThrustSbcFiring.tooltip, { cap: 0 })}
                   onMouseLeave={hide}
                 ><span className={heat_maxThrustSbcFiring.className}>{
                   heat_maxThrustSbcFiring.type === 'string'
