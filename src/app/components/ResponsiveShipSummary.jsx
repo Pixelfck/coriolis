@@ -59,6 +59,39 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
     const restingHeat = Math.sqrt(((ship.standard[0].m.pgen * ship.standard[0].m.eff) / ship.heatCapacity) / 0.2);
     const armourMetrics = Calc.armourMetrics(ship);
 
+    // Heat stats
+    const ppEfficiency = ship.standard[0].m.getThermalEfficiency(); // Power Plant efficiency rate
+    const scbStats = ship.getShieldBankCellStats();
+    const thermalLoad = {
+      all: {
+        retracted: ship.powerRetracted * ppEfficiency, // Total thermal output for all modules, weapons retracted
+        deployed: ship.powerDeployed * ppEfficiency, // Total thermal output for all modules, weapons deployed
+      },
+      thrusters: ship.standard[1].m.get('thermload'), // Thermal output for Thrusters
+      fsd: ship.standard[2].m.get('thermload'), // Thermal output for Frame Shift Drive
+      hardpoints: ship.getHardpointsThermalLoad(pips.wep),
+      scb: scbStats.thermalLoad,
+    };
+
+    const hasWeapons = ship.hasHadrdpointMounted();
+    const hasSbcs = ship.hasShieldCellBanksMounted();
+
+    const formatHeat = function(heatLevel) {
+      if (heatLevel.type === 'string') {
+        return heatLevel.result;
+      } else if (heatLevel.type === 'percentage') {
+        return formats.pct(heatLevel.result);
+      }
+      return formats.time(heatLevel.result) + "s";
+    };
+
+    const heat_idle = ship.getHeatLevel(thermalLoad.all.retracted, 0);
+    const heat_maxThrust = ship.getHeatLevel(thermalLoad.thrusters, thermalLoad.all.retracted);
+    const heat_maxThrustFsdCharging = ship.getHeatLevel(thermalLoad.fsd, thermalLoad.all.retracted + thermalLoad.thrusters);
+    const heat_allWeaponsFiring_capacitorFull = ship.getHeatLevel(thermalLoad.hardpoints.weaponCapacitorFull, thermalLoad.all.deployed + thermalLoad.thrusters);
+    const heat_allWeaponsFiring_capacitorNearEmpty = ship.getHeatLevel(thermalLoad.hardpoints.weaponCapacitorEmpty, thermalLoad.all.deployed + thermalLoad.thrusters);
+    const heat_maxThrustSbcFiring = ship.getHeatLevel(thermalLoad.scb, thermalLoad.all.deployed + thermalLoad.thrusters, scbStats.maxSpinupTime);
+
     /**
      * Format large credit values compactly (e.g. 1.05Bn, 52.4M)
      * @param {number} value Credit amount
@@ -503,7 +536,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                     className='value'
                     onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_IDLE', { cap: 0 })}
                     onMouseLeave={hide}
-                  >{formats.pct(restingHeat)}</td>
+                  >{formatHeat(heat_idle)}</td>
                 </tr>
                 <tr>
                   <td className='label'>
@@ -579,7 +612,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   className='value'
                   onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST', { cap: 0 })}
                   onMouseLeave={hide}
-                >{formats.pct(restingHeat)}</td>
+                >{formatHeat(heat_maxThrust)}</td>
               </tr>
               <tr>
                 <td className='label'>
@@ -590,7 +623,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   className='value'
                   onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_FSD', { cap: 0 })}
                   onMouseLeave={hide}
-                >{formats.pct(restingHeat)}</td>
+                >{formatHeat(heat_maxThrustFsdCharging)}</td>
               </tr>
               <tr>
                 <td className='label'>
@@ -601,7 +634,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   className='value'
                   onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_FULL_CAP', { cap: 0 })}
                   onMouseLeave={hide}
-                >{formats.pct(restingHeat)}*</td>
+                >{hasWeapons ? formatHeat(heat_allWeaponsFiring_capacitorFull) + " *" : '-'}</td>
               </tr>
               <tr>
                 <td className='label'>
@@ -612,7 +645,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   className='value'
                   onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_EMPTY_CAP', { cap: 0 })}
                   onMouseLeave={hide}
-                >{formats.pct(restingHeat)}*</td>
+                >{hasWeapons ? formatHeat(heat_allWeaponsFiring_capacitorNearEmpty) + " *" : '-'}</td>
               </tr>
               <tr>
                 <td className='label'>
@@ -623,7 +656,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   className='value'
                   onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_SCBS', { cap: 0 })}
                   onMouseLeave={hide}
-                >{formats.pct(restingHeat)}</td>
+                >{hasSbcs ? formatHeat(heat_maxThrustSbcFiring) : '-'}</td>
               </tr>
               </tbody>
             </table>

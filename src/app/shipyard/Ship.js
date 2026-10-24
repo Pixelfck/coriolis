@@ -2202,6 +2202,191 @@ export default class Ship {
   }
 
   /**
+   * Get the heat equilibrium.
+   * @param heatDisipationMax
+   * @param thermalLoad
+   * @returns {number} heat level
+   */
+  getEquilibriumHeatLevel(heatDisipationMax, thermalLoad) {
+    // https://forums.frontier.co.uk/threads/research-detailed-heat-mechanics.286628/post-6399855
+    return Math.sqrt(thermalLoad / heatDisipationMax);
+  };
+
+  /**
+   * Calculate the time to reach a certain heat level.
+   * @param heatCapacity
+   * @param heatDisipationMax
+   * @param thermalLoad
+   * @param heatLevel0
+   * @param heatLevel
+   * @returns {number} seconds
+   */
+  getTimeUntilHeatLevel(heatCapacity, heatDisipationMax, thermalLoad, heatLevel0, heatLevel) {
+    // https://forums.frontier.co.uk/threads/research-detailed-heat-mechanics.286628/post-6519883
+    let C;
+
+    heatDisipationMax /= heatCapacity;
+    if (!thermalLoad) {
+      C = -1 / (heatDisipationMax * heatLevel0);
+      return ((1 / (heatDisipationMax * heatLevel)) + C);
+    }
+
+    thermalLoad /= heatCapacity;
+    const sqrtAdivB = Math.sqrt(heatDisipationMax / thermalLoad);
+    const sqrtAmulB = Math.sqrt(heatDisipationMax * thermalLoad);
+    C = -Math.atanh(heatLevel0 * sqrtAdivB) / sqrtAmulB
+
+    return ((Math.atanh(heatLevel * sqrtAdivB) / sqrtAmulB) + C);
+  };
+
+  /**
+   * Calculate the heat level after x seconds.
+   * @param heatCapacity
+   * @param heatDisipationMax
+   * @param thermalLoad
+   * @param heatLevel0
+   * @param seconds
+   * @returns {number} heat level
+   */
+  getThermalLoadAtTime(heatCapacity, heatDisipationMax, thermalLoad, heatLevel0, seconds) {
+    // https://forums.frontier.co.uk/threads/research-detailed-heat-mechanics.286628/post-6519883
+    let C;
+
+    heatDisipationMax /= heatCapacity;
+    if (!thermalLoad) {
+      C = -1 / (heatDisipationMax * heatLevel0);
+      return ((1 / (seconds - C)) / heatDisipationMax);
+    }
+
+    thermalLoad /= heatCapacity;
+    const sqrtAdivB = Math.sqrt(heatDisipationMax / thermalLoad);
+    const sqrtAmulB = Math.sqrt(heatDisipationMax * thermalLoad);
+    C = -Math.atanh(heatLevel0 * sqrtAdivB) / sqrtAmulB
+
+    return (Math.tanh((seconds - C) * sqrtAmulB) / sqrtAdivB);
+  };
+
+  /**
+   * Get the effective thermal load for a hardpoint.
+   * @param thermalLoad
+   * @param distributerDraw
+   * @param weaponCapacitor
+   * @param weplvl
+   * @returns {number}
+   */
+  getEffectiveWeaponThermalLoad(thermalLoad, distributerDraw, weaponCapacitor, weplvl) {
+    // https://forums.frontier.co.uk/threads/research-detailed-heat-mechanics.286628/post-6408594
+    return (thermalLoad * (1 + 4 * Math.min(Math.max(1 - (weaponCapacitor * weplvl - distributerDraw) / weaponCapacitor, 0), 1)));
+  };
+
+  hasHadrdpointMounted() {
+    for (let slot of this.hardpoints) {
+      if (slot.m) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  hasShieldCellBanksMounted() {
+    for (let slot of this.internal) {
+      if (slot.m && slot.m.grp === 'scb') {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  /**
+   * Calculate thermal load and (maximum) spinup time for the ship's Shield Bank Cells.
+   * @returns {{maxSpinupTime: number, thermalLoad: number}}
+   */
+  getShieldBankCellStats() {
+    let thermalLoad = 0;
+    let maxSpinupTime = 0;
+    for (let slot of this.internal) {
+      if (slot.m && slot.m.grp === 'scb') {
+        thermalLoad += slot.m.get('thermload') / slot.m.get('spinup');
+        maxSpinupTime = Math.max(maxSpinupTime, slot.m.get('spinup'));
+      }
+    }
+
+    return {
+      thermalLoad: thermalLoad,
+      maxSpinupTime: maxSpinupTime,
+    };
+  }
+
+  /**
+   * Get the percentage of sustained DPS that can be accommodated by the WEP capacitor's current recharge rate, with current pips allocation
+   * the average WEP capacitor draw from firing all weapons continuously, including reload breaks.
+   * @param {int} wep the currently allocated weapon capacitor pips
+   * @returns {number} percentage of sustained weapons fire
+   */
+  getSustainedWeaponsFireRate(wep) {
+    const weaponsCapacitorRechargeRate = this.standard[4].m.get('weprate');
+    const pdWeaponMultiplier = Math.pow(wep / 4, 1.1);
+    const sustainedEnergyDrawPerSecond = this.getSustainedHardpointEnergyDrawPerSecond();
+
+    return Math.min(Math.max(weaponsCapacitorRechargeRate * pdWeaponMultiplier / sustainedEnergyDrawPerSecond, 0), 1);
+  };
+
+  /**
+   * Get the sustained energy concumption per second, with all weapons firing, taking reloading into account.
+   * @returns {number}
+   */
+  getSustainedHardpointEnergyDrawPerSecond(){
+    let sustainedEnergyPerSecond = 0;
+    for (let slot of this.hardpoints) {
+      if (slot.m) {
+        sustainedEnergyPerSecond += (slot.m.getClip() ? (slot.m.getClip() * slot.m.getEps() / slot.m.getRoF()) / ((slot.m.getClip() / slot.m.getRoF()) + slot.m.getReload()) : slot.m.getEps());
+      }
+    }
+    return sustainedEnergyPerSecond;
+  }
+
+  /**
+   * Get the time to drain a full weapon capacitor, with all weapons firing
+   * @returns {number} time in seconds
+   */
+  getTimeTillWeaponCapacitorEmpty() {
+    const pdWeaponCapacitor = this.standard[4].m.wepcap; // Power Distributor weapon capacitor (MJ)
+    const sustainedEnergyDrawPerSecond = this.getSustainedHardpointEnergyDrawPerSecond();
+
+    return pdWeaponCapacitor / sustainedEnergyDrawPerSecond;
+  }
+
+  /**
+   * Get the thermal load for the ship's hardpoints, both for a (near) empty weapon capacitor and a full one
+   * @param {int} wep the currently allocated weapon capacitor pips
+   * @returns {{weaponCapacitorFull: number, weaponCapacitorEmpty: number}}
+   */
+  getHardpointsThermalLoad(wep) {
+    const weaponSustainedFireRate = this.getSustainedWeaponsFireRate(wep);
+    const pdWeaponCapacitor = this.standard[4].m.wepcap; // Power Distributor weapon capacitor (MJ)
+    const effectiveThermalLoad = {
+      weaponCapacitorFull: 0,
+      weaponCapacitorEmpty: 0,
+    };
+
+    let thermalLoad, sustainedSecondsPerCycle;
+    for (let slot of this.hardpoints) {
+      if (slot.m) {
+        sustainedSecondsPerCycle = slot.m.getSustainedSecondsPerCycle() || 1;
+        thermalLoad = slot.m.get('thermload') * (slot.m.getSustainedFiringsPerCycle() / sustainedSecondsPerCycle);
+        effectiveThermalLoad.weaponCapacitorFull += this.getEffectiveWeaponThermalLoad(thermalLoad, slot.m.get('distdraw'), pdWeaponCapacitor, 1);
+        effectiveThermalLoad.weaponCapacitorEmpty += this.getEffectiveWeaponThermalLoad(thermalLoad, slot.m.get('distdraw'), pdWeaponCapacitor, 0);
+      }
+    }
+    effectiveThermalLoad.weaponCapacitorFull *= weaponSustainedFireRate;
+    effectiveThermalLoad.weaponCapacitorEmpty *= weaponSustainedFireRate;
+
+    return effectiveThermalLoad;
+  };
+
+  /**
    * Upgrade information about internals with version changes
    * @param {array} internals     the internals from the ship code
    * @param {int}   offset        the offset of the internals information in the priorities etc. arrays
@@ -2233,4 +2418,82 @@ export default class Ship {
       internals.splice(Ships[this.id].slots.internal.length);
     }
   }
+
+  /**
+   * Get the ship's thermal load.
+   *
+   * @param thermalLoad
+   * @param thermalLoadBase
+   * @param duration
+   * @returns {object} thermal load information
+   */
+  getHeatLevel(thermalLoad, thermalLoadBase, duration) {
+    if (thermalLoad === 0) {
+      return {
+        type: 'string',
+        result: '-',
+        className: 'primary',
+        tooltip: 'PHRASE_HEAT_NO_WEAPON_PIPS',
+      }
+    }
+
+    if (thermalLoadBase > this.heatDissipationMax) {
+      return {
+        type: 'string',
+        result: '∞',
+        className: 'warning',
+        tooltip: 'PHRASE_HEAT_BASE_OVERLOAD',
+      }
+    }
+
+    thermalLoad += thermalLoadBase;
+    if (thermalLoad <= this.heatDissipationMax) {
+      return {
+        type: 'percentage',
+        result: this.getEquilibriumHeatLevel(this.heatDissipationMax, thermalLoad) / 1.5,
+        tooltip: 'PHRASE_HEAT_BASE_STABLE',
+      }
+    }
+
+    const heatLevelBase = this.getEquilibriumHeatLevel(this.heatDissipationMax, thermalLoadBase);
+    const time10 = this.getTimeUntilHeatLevel(this.heatCapacity, this.heatDissipationMax, thermalLoad, heatLevelBase, 1.0);
+    const time15 = (this.heatCapacity / 2) / (thermalLoad - this.heatDissipationMax); // displayed heatLevel 66% -> 100% is actual heatlevel 1.0 -> 1.5
+
+    if (!duration) {
+      return {
+        type: 'time',
+        result: time10 + time15,
+        className: 'warning',
+        tooltip: 'PHRASE_HEAT_TIME_UNTIL_OVERHEAT',
+      }
+    }
+
+    if (time10 > duration) {
+      return {
+        type: 'percentage',
+        result: this.getThermalLoadAtTime(this.heatCapacity, this.heatDissipationMax, thermalLoad, heatLevelBase, duration) / 1.5,
+        tooltip: 'PHRASE_HEAT_STABLE',
+      }
+    }
+
+    if (time10 + time15 > duration) {
+      return {
+        type: 'percentage',
+        result: (2 + ((duration - time10) / time15)) / 3,
+        tooltip: 'PHRASE_HEAT_STABLE',
+      }
+    }
+
+    duration -= time10 + time15;
+    const heatLevelPeak = 1.5 + (duration * (thermalLoad - this.heatDissipationMax) / this.heatCapacity);
+    const timeCool = (heatLevelPeak - 1.5) / ((this.heatDissipationMax - thermalLoadBase) / this.heatCapacity);
+
+    // TODO: find a method to make this tooltip strings translatable?
+    return {
+      type: 'percentage',
+      result: (heatLevelPeak / 1.5),
+      className: 'warning',
+      tooltip: 'Ship will overheat after ' +  Math.floor(time10 + time15) + ' second' + (Math.floor(time10 + time15) === 1 ? '' : 's') + ', and will remain overheated for ' + Math.floor(duration + timeCool) + ' second' + (Math.floor(duration + timeCool) === 1 ? '' : 's.'),
+    }
+  };
 }

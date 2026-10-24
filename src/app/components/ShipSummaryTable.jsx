@@ -54,7 +54,6 @@ export default class ShipSummaryTable extends TranslatedComponent {
     const sgMetrics = Calc.shieldMetrics(ship, pips.sys);
     const distBoost = canBoost ?  Calc.calcBoost(ship) : 'No Boost';
     //const shipBoost = ship.boostInterval(ship)
-    const restingHeat = Math.sqrt(((ship.standard[0].m.pgen * ship.standard[0].m.eff) / ship.heatCapacity) / 0.2);
     const armourMetrics = Calc.armourMetrics(ship);
     let shieldColour = 'blue';
     if (shieldGenerator && shieldGenerator.m.grp === 'psg') {
@@ -65,6 +64,17 @@ export default class ShipSummaryTable extends TranslatedComponent {
     this.state = {
       shieldColour
     };
+    // calculate heat level
+    const ppEfficiency = ship.standard[0].m.getThermalEfficiency(); // Power Plant efficiency rate
+    const thermalLoad_retracted = ship.powerRetracted * ppEfficiency; // Total thermal output for all modules, weapons retracted
+    const heat_idle = ship.getHeatLevel(thermalLoad_retracted, 0);
+
+
+    console.log('ppEfficiency', ppEfficiency);
+    console.log('thermalLoad (retracted)', thermalLoad_retracted);
+    console.log('heat (idle)', heat_idle);
+
+
     return <div id='summary'>
       <div style={{display: "table", width: "100%"}}>
         <div style={{display: "table-row"}}>
@@ -129,7 +139,10 @@ export default class ShipSummaryTable extends TranslatedComponent {
                 <td>{int(ship.hardness)}</td>
                 <td>{ship.crew}</td>
                 <td>{ship.masslock}</td>
-                <td>{formats.pct(restingHeat)}</td>
+                <td onMouseEnter={termtip.bind(null, heat_idle.tooltip, { cap: 0 })} onMouseLeave={hide}>
+                  {heat_idle.type === 'string' ? heat_idle.result : heat_idle.type === 'percentage' ? formats.pct(heat_idle.result) : formats.time(heat_idle.result)}
+                  {heat_idle.className === 'warning' ? <span className='warning'> <Warning/></span> : null}
+                </td>
               </tr>
             </tbody>
           </table>
