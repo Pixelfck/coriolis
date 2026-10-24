@@ -496,10 +496,14 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
               <tbody>
                 <tr>
                   <td className='label'>
-                    <span className='label-full'>HEAT ({translate('BETA')})</span>
-                    <span className='label-abbr'>HEAT ({translate('BETA')})</span>
+                    <span className='label-full'>{translate('HEAT (IDLE)')}</span>
+                    <span className='label-abbr'>{translate('HEAT (IDLE)')}</span>
                   </td>
-                  <td className='value'>{formats.pct(restingHeat)}</td>
+                  <td
+                    className='value'
+                    onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_IDLE', { cap: 0 })}
+                    onMouseLeave={hide}
+                  >{formats.pct(restingHeat)}</td>
                 </tr>
                 <tr>
                   <td className='label'>
@@ -553,6 +557,74 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                     {compactCredits(ship.totalCost * Insurance[Persist.getInsurance()])}{u.CR}
                   </td>
                 </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Heat Stats */}
+          <div className='stat-table'>
+            <div className='stat-table-header'>{translate('HEAT')}</div>
+            <table>
+              <colgroup>
+                <col className='stat-label-col' />
+                <col className='stat-value-col' />
+              </colgroup>
+              <tbody>
+              <tr>
+                <td className='label'>
+                  <span className='label-full'>{translate('MAX THRUST')}</span>
+                  <span className='label-abbr'>{translate('MAX THRUST')}</span>
+                </td>
+                <td
+                  className='value'
+                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST', { cap: 0 })}
+                  onMouseLeave={hide}
+                >{formats.pct(restingHeat)}</td>
+              </tr>
+              <tr>
+                <td className='label'>
+                  <span className='label-full'>{translate('THRUST+FSD')}</span>
+                  <span className='label-abbr'>{translate('THRUST+FSD')}</span>
+                </td>
+                <td
+                  className='value'
+                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_FSD', { cap: 0 })}
+                  onMouseLeave={hide}
+                >{formats.pct(restingHeat)}</td>
+              </tr>
+              <tr>
+                <td className='label'>
+                  <span className='label-full'>{translate('THRUST+WPN')}</span>
+                  <span className='label-abbr'>{translate('THRUST+WPN')}</span>
+                </td>
+                <td
+                  className='value'
+                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_FULL_CAP', { cap: 0 })}
+                  onMouseLeave={hide}
+                >{formats.pct(restingHeat)}*</td>
+              </tr>
+              <tr>
+                <td className='label'>
+                  <span className='label-full'>{translate('THRUST+WPN')}</span>
+                  <span className='label-abbr'>{translate('THRUST+WPN')}</span>
+                </td>
+                <td
+                  className='value'
+                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_WEAPONS_EMPTY_CAP', { cap: 0 })}
+                  onMouseLeave={hide}
+                >{formats.pct(restingHeat)}*</td>
+              </tr>
+              <tr>
+                <td className='label'>
+                  <span className='label-full'>{translate('THRUST+SCB')}</span>
+                  <span className='label-abbr'>{translate('THRUST+SCB')}</span>
+                </td>
+                <td
+                  className='value'
+                  onMouseEnter={termtip.bind(null, 'TT_SUMMARY_HEAT_MAX_THRUST_AND_SCBS', { cap: 0 })}
+                  onMouseLeave={hide}
+                >{formats.pct(restingHeat)}</td>
+              </tr>
               </tbody>
             </table>
           </div>
