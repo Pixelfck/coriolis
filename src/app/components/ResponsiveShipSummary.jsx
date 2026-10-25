@@ -525,7 +525,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                   </td>
                   <td
                     className='value'
-                    onMouseEnter={termtip.bind(null, heat_idle.tooltip, { cap: 0 })}
+                    onMouseEnter={heat_idle.tooltip?termtip.bind(null, heat_idle.tooltip, { cap: 0 }):null}
                     onMouseLeave={hide}
                   ><span className={heat_idle.className}>{
                     heat_idle.type === 'string'
@@ -610,7 +610,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                 </td>
                 <td
                   className='value'
-                  onMouseEnter={termtip.bind(null, heat_maxThrust.tooltip, { cap: 0 })}
+                  onMouseEnter={heat_maxThrust.tooltip?termtip.bind(null, heat_maxThrust.tooltip, { cap: 0 }):null}
                   onMouseLeave={hide}
                 ><span className={heat_maxThrust.className}>{
                   heat_maxThrust.type === 'string'
@@ -630,7 +630,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                 </td>
                 <td
                   className='value'
-                  onMouseEnter={termtip.bind(null, heat_maxThrustFsdCharging.tooltip, { cap: 0 })}
+                  onMouseEnter={heat_maxThrustFsdCharging.tooltip?termtip.bind(null, heat_maxThrustFsdCharging.tooltip, { cap: 0 }):null}
                   onMouseLeave={hide}
                 ><span className={heat_maxThrustFsdCharging.className}>{
                   heat_maxThrustFsdCharging.type === 'string'
@@ -650,7 +650,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                 </td>
                 <td
                   className='value'
-                  onMouseEnter={termtip.bind(null, heat_allWeaponsFiring_capacitorFull.tooltip, { cap: 0 })}
+                  onMouseEnter={heat_allWeaponsFiring_capacitorFull.tooltip?termtip.bind(null, heat_allWeaponsFiring_capacitorFull.tooltip, { cap: 0 }):null}
                   onMouseLeave={hide}
                 ><span className={heat_allWeaponsFiring_capacitorFull.className}>{
                   heat_allWeaponsFiring_capacitorFull.type === 'string'
@@ -670,7 +670,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                 </td>
                 <td
                   className='value'
-                  onMouseEnter={termtip.bind(null, heat_allWeaponsFiring_capacitorNearEmpty.tooltip, { cap: 0 })}
+                  onMouseEnter={heat_allWeaponsFiring_capacitorNearEmpty.tooltip?termtip.bind(null, heat_allWeaponsFiring_capacitorNearEmpty.tooltip, { cap: 0 }):null}
                   onMouseLeave={hide}
                 ><span className={heat_allWeaponsFiring_capacitorNearEmpty.className}>{
                   heat_allWeaponsFiring_capacitorNearEmpty.type === 'string'
@@ -690,7 +690,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                 </td>
                 <td
                   className='value'
-                  onMouseEnter={termtip.bind(null, heat_maxThrustSbcFiring.tooltip, { cap: 0 })}
+                  onMouseEnter={heat_maxThrustSbcFiring.tooltip?termtip.bind(null, heat_maxThrustSbcFiring.tooltip, { cap: 0 }):null}
                   onMouseLeave={hide}
                 ><span className={heat_maxThrustSbcFiring.className}>{
                   heat_maxThrustSbcFiring.type === 'string'

@@ -2460,7 +2460,6 @@ export default class Ship {
       return {
         type: 'percentage',
         result: this.getEquilibriumHeatLevel(this.heatDissipation, thermalLoad) / 1.5,
-        tooltip: 'PHRASE_HEAT_BASE_STABLE',
       }
     }
 
@@ -2481,7 +2480,6 @@ export default class Ship {
       return {
         type: 'percentage',
         result: this.getThermalLoadAtTime(this.heatCapacity, this.heatDissipation, thermalLoad, heatLevelBase, duration) / 1.5,
-        tooltip: 'PHRASE_HEAT_STABLE',
       }
     }
 
@@ -2489,7 +2487,6 @@ export default class Ship {
       return {
         type: 'percentage',
         result: (2 + ((duration - time10) / time15)) / 3,
-        tooltip: 'PHRASE_HEAT_STABLE',
       }
     }
 
