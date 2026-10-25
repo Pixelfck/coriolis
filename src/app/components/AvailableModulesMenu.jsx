@@ -3,10 +3,12 @@ import PropTypes from 'prop-types';
 import TranslatedComponent from './TranslatedComponent';
 import cn from 'classnames';
 import { stopCtxPropagation } from '../utils/UtilityFunctions';
-import { MountFixed, MountGimballed, MountTurret, Warning, CommunityGoalSmall, TechBrokerSmall, PowerPlaySmall } from './SvgIcons';
+import { MountFixed, MountGimballed, MountTurret, Warning, CommunityGoalSmall, TechBrokerSmall, PowerPlaySmall, MercCoinSmall, StarHollow, StarFilled, Reload } from './SvgIcons';
 import ModalConfirmCG from './ModalConfirmCG';
 import Persist from '../stores/Persist';
 import Module from '../shipyard/Module';
+import { getBlueprint } from '../utils/BlueprintFunctions';
+import { Modifications } from 'coriolis-data/dist';
 
 
 const PRESS_THRESHOLD = 500; // mouse/touch down threshold
@@ -33,7 +35,10 @@ const GRPCAT = {
   'pcm': 'passenger cabins',
   'pcq': 'passenger cabins',
   'fh': 'hangars',
+  'fhmkii': 'hangars',
   'pv': 'hangars',
+  'lpv': 'hangars',
+  'lpvmkii': 'hangars',
   'fs': 'fuel',
   'ft': 'fuel',
   'hr': 'structural reinforcement',
@@ -102,7 +107,7 @@ const INTCAT = {
   'cargo racks': ['cr', 'crl'],
   'fsd interdictor': ['fi'],
   'fuel': ['ft', 'fs'],
-  'hangars': ['fh', 'pv'],
+  'hangars': ['fh', 'fhmkii', 'pv', 'lpv', 'lpvmkii'],
   'limpet controllers': ['cc', 'fx', 'hb', 'pc', 'rpl', 'mlc'],
   'passenger cabins': ['pce', 'pcemkii', 'pci', 'pcimkii', 'pcm', 'pcq'],
   'refineries': ['rf'],
@@ -146,6 +151,7 @@ export default class AvailableModulesMenu extends TranslatedComponent {
     warning: PropTypes.func.isRequired,
     diffDetails: PropTypes.func.isRequired,
     m: PropTypes.object,
+    ship: PropTypes.object,
     eligible: PropTypes.func.isRequired,
     slot: PropTypes.object, // Add this line for slot restriction information
     selectedCategory: PropTypes.string, // Category to filter by ('current' for same as fitted module, or category name)
@@ -178,11 +184,20 @@ export default class AvailableModulesMenu extends TranslatedComponent {
       return <PowerPlaySmall className='powerplay' />;
     }
 
+    // Check for Merc Coin modules (via flag or preEngineered availability)
+    if (mod.mercModule) {
+      return <MercCoinSmall className='merccoin' />;
+    }
+
     // Then check for pre-engineered modules (CG or Tech Broker)
     if (!mod.preEngineered) return null;
 
     if (mod.preEngineered.availability === 'CG') {
       return <CommunityGoalSmall className='community' />;
+    }
+
+    if (mod.preEngineered.availability === 'MercCoin') {
+      return <MercCoinSmall className='merccoin' />;
     }
 
     if (typeof mod.preEngineered.availability === 'undefined') {
@@ -211,12 +226,15 @@ export default class AvailableModulesMenu extends TranslatedComponent {
     this._scrollToActiveModule = this._scrollToActiveModule.bind(this);
     this._handleSearchChange = this._handleSearchChange.bind(this);
     this._filterModulesBySearch = this._filterModulesBySearch.bind(this);
+    this._toggleFavouritesMode = this._toggleFavouritesMode.bind(this);
+    this._getSlotFavourites = this._getSlotFavourites.bind(this);
     this.searchInputRef = React.createRef();
 
     const initialState = this._initState(props, context);
     this.state = {
       ...initialState,
-      searchQuery: ''
+      searchQuery: '',
+      favouritesMode: false
       // Don't override allModules - it's already in initialState
     };
   }
@@ -236,7 +254,11 @@ export default class AvailableModulesMenu extends TranslatedComponent {
 
     // Name / class+rating header — orange bg, dark brown text, matching engineering menu headings
     const classRating = mod.class && mod.rating ? `${mod.class}${mod.rating} ` : '';
-    rows.push(<div key='name' className='cap' style={{ margin: '-0.5em -0.5em 0.4em -0.5em', padding: '0.2em 0.5em', background: '#FF8C0D', color: 'rgba(56,30,0,0.85)', textAlign: 'left', fontWeight: 'bold', textTransform: 'uppercase' }}>{classRating}{translate(mod.name || mod.grp)}</div>);
+    // Prefer the specific module name (name, then ukName) over the generic group
+    // label so variants that share a group — e.g. the Large vs MkII Large vs
+    // FREE Planetary Vehicle Hangars — are distinguishable in the tooltip.
+    const headerName = mod.name ? translate(mod.name) : (rawMod.ukName || translate(mod.grp));
+    rows.push(<div key='name' className='cap' style={{ margin: '-0.5em -0.5em 0.4em -0.5em', padding: '0.2em 0.5em', background: '#FF8C0D', color: 'rgba(56,30,0,0.85)', textAlign: 'left', fontWeight: 'bold', textTransform: 'uppercase' }}>{classRating}{headerName}</div>);
 
     // Power
     if (mod.grp === 'pp') {
@@ -297,15 +319,35 @@ export default class AvailableModulesMenu extends TranslatedComponent {
 
     // Fuel scoop / tank
     if (mod.fuel) rows.push(<div key='fuel'>{translate('fuel')}: {mod.fuel}{units.T}</div>);
-    if (mod.cargo) rows.push(<div key='cargo'>{translate('cargo')}: {mod.cargo}{units.T}</div>);
+    if (mod.cargo) {
+      let displayCargo = mod.cargo;
+      if (mod.preEngineered && mod.preEngineered.blueprints) {
+        for (const bpName of mod.preEngineered.blueprints) {
+          const findBp = val => Object.keys(Modifications.blueprints).find(elem => elem.toString().toLowerCase().search(val.toString().toLowerCase()) >= 0);
+          const bp = Modifications.blueprints[findBp(bpName)];
+          const grade = mod.preEngineered.grade || 1;
+          if (bp && bp.grades && bp.grades[grade] && bp.grades[grade].features && bp.grades[grade].features.cargo) {
+            const cargoMod = bp.grades[grade].features.cargo[1];
+            displayCargo = Math.round(displayCargo * (1 + cargoMod));
+          }
+        }
+      }
+      rows.push(<div key='cargo'>{translate('cargo')}: {displayCargo}{units.T}</div>);
+    }
 
     // Scan stats
     if (mod.getScanTime()) rows.push(<div key='scantime'>{translate('scantime')}: {formats.f1(mod.getScanTime())}{units.s}</div>);
     if (mod.getScanAngle()) rows.push(<div key='scanangle'>{translate('scan angle')}: {formats.f2(mod.getScanAngle())}°</div>);
 
-    // Cost
+    // Cost — show the credit cost, or an explicit "Free" when the module has
+    // no cost (e.g. the free Large Planetary Vehicle Hangar variants) so users
+    // can tell free and paid variants apart.
     const cost = rawMod.cost;
-    if (cost) rows.push(<div key='cost'>{translate('cost')}: {formats.int(Math.round(cost * (1 - Persist.getModuleDiscount())))}{units.CR}</div>);
+    if (cost) {
+      rows.push(<div key='cost'>{translate('cost')}: {formats.int(Math.round(cost * (1 - Persist.getModuleDiscount())))}{units.CR}</div>);
+    } else if (cost === 0) {
+      rows.push(<div key='cost'>{translate('cost')}: {translate('free')}</div>);
+    }
 
     if (rows.length === 0) return null;
 
@@ -421,7 +463,20 @@ export default class AvailableModulesMenu extends TranslatedComponent {
 
     // Filter by category if specified
     if (selectedCategory) {
-      if (selectedCategory === 'current' && m) {
+      if (selectedCategory.startsWith('favourites:')) {
+        // Favourites mode - show favourite modules in this category
+        const favCategory = selectedCategory.replace('favourites:', '');
+        const favourites = Persist.getFavourites();
+        // Filter favourites by category and eligibility
+        const filteredFavourites = favourites.filter(fav => {
+          if (!fav || !fav.grp) return false;
+          if (eligible && !eligible(fav)) return false;
+          return this._getModuleCategory(fav) === favCategory;
+        });
+        // Render favourites instead of normal modules
+        this._processFavouriteModules(filteredFavourites, list, onSelect, eligible, warning, termtip, tooltip, translate);
+        allModules = []; // Clear normal modules since we're showing favourites
+      } else if (selectedCategory === 'current' && m) {
         // Filter to modules in the same category as the currently fitted module
         const currentCategory = this._getModuleCategory(m);
         if (currentCategory) {
@@ -466,8 +521,15 @@ export default class AvailableModulesMenu extends TranslatedComponent {
     const name = (mod.name || '').toLowerCase();
     const grp = mod.grp || '';
 
-    // Filter out any module with "unrecognised" in name or ID
-    if (name.includes('unrecognised') || id.includes('unrecognised')) return false;
+    // Filter out any module with "unrecognised" in name, ukName or ID. The
+    // placeholder 'Unrecognised Thrusters' carries its marker in ukName (not
+    // name), so check both.
+    const ukName = (mod.ukName || '').toLowerCase();
+    if (name.includes('unrecognised') || ukName.includes('unrecognised') || id.includes('unrecognised')) return false;
+
+    // Rating 'Z' is reserved for unrecognised/placeholder modules that exist only
+    // to keep imports from erroring; never offer them in the menu.
+    if (mod.rating === 'Z') return false;
 
     // Filter out specific error/placeholder modules by ID — only if they have no name or ukName
     // (e.g. '1z' is also used by the Rocket Propelled FSD Disruptor, a valid PowerPlay module)
@@ -486,9 +548,14 @@ export default class AvailableModulesMenu extends TranslatedComponent {
     // Filter out modules with invalid/missing critical properties for their type
     if (!mod.class && !mod.rating && !mod.name && mod.id.length < 3) return false;
 
-    // Filter out ship-specific thrusters that don't match the current ship
-    if (mod.ship && this.props.ship && mod.ship !== this.props.ship.id) {
-      return false;
+    // Filter out ship-specific modules that don't match the current ship.
+    // `mod.ship` may be a single ship id or an array of ids (e.g. the Mining
+    // Volley Repeater, available to both the Type-11 and the Anaconda Mk II).
+    if (mod.ship && this.props.ship) {
+      const allowedShips = Array.isArray(mod.ship) ? mod.ship : [mod.ship];
+      if (!allowedShips.includes(this.props.ship.id)) {
+        return false;
+      }
     }
 
     return true;
@@ -689,6 +756,7 @@ export default class AvailableModulesMenu extends TranslatedComponent {
         <div className="module-content"> {availabilityIcon}
           {mountIcon && <span className="module-mount">{mountIcon}</span>}
           <span className="module-text">{warningIcon} {displayName} </span>
+          {mod.cost === 0 && <span className="module-free-badge" title={translate('free')}>{translate('free')}</span>}
         </div>
       </div>
     );
@@ -980,66 +1048,253 @@ export default class AvailableModulesMenu extends TranslatedComponent {
         groups.forEach(group => {
           const { groupKey, modules: groupModules } = group;
 
-          // Determine if we should show a group header (sub-header)
-          // Always show sub-headers so users can identify module types,
-          // especially when a category filter is active and only one group
-          // is visible (e.g. Pulse Wave Analyzer under Mining in utility slots).
-          const shouldShowGroupHeader = true;
+          // A single module group can contain several distinctly-named variants
+          // (e.g. the thruster group 't' holds ordinary Thrusters plus Enhanced
+          // Performance and ship-specific Mk II variants). Each variant needs its
+          // OWN sub-heading; otherwise the group heading is derived from whichever
+          // module happens to sort first, which mislabels the whole group. Split
+          // the group into ordered variant sub-groups and render each with the
+          // correct heading. Modules with no distinct variant fall under the
+          // group's own display name (e.g. "Thrusters").
+          const baseGroupName = this._getGroupDisplayName(groupKey, groupModules);
+          const subGroups = this._partitionGroupVariants(groupModules, groupKey, baseGroupName);
 
-          if (shouldShowGroupHeader) {
-            // Get group display name using the new method
-            const groupDisplayName = this._getGroupDisplayName(groupKey, groupModules);
+          subGroups.forEach(({ heading, modules: subModules }, subIdx) => {
+            // Separate compact and named modules within this variant sub-group
+            const compactModules = [];
+            const namedModules = [];
 
-            // Add group header (sub-category)
-            list.push(<div key={`group-${groupKey}`} className="module-separator cap">{groupDisplayName}</div>);
-          }
-
-          // Separate compact and named modules within this group
-          const compactModules = [];
-          const namedModules = [];
-
-          groupModules.forEach(mod => {
-            if (this._isCompactModule(mod)) {
-              compactModules.push(mod);
-            } else {
-              // Check if the module is a planetary approach suite and if the slot is pas restricted
-              if (mod.grp === 'pas') {
-                // Check if 'eligible' is set and if eligible has 'pas'
-                if (eligible({ grp: 'pas' })) {
-                  namedModules.push(mod); // Only add PAS if the slot is pas restricted and this module is a PAS
-                  console.log('Adding PAS module to pas restricted slot:', mod);
-                } else {
-                  console.log('Skipping PAS module for non pas restricted slot:', mod, ' slot eligible:', eligible);
-                  // continue to the next item in the loop and skip adding the pas module to the availableModulesMenu for a non pas restricted slot
-                  return;
-                }
+            subModules.forEach(mod => {
+              if (this._isCompactModule(mod)) {
+                compactModules.push(mod);
               } else {
-                // For all other modules (NOT including bulkheads), add them normally
-                namedModules.push(mod);
+                // Check if the module is a planetary approach suite and if the slot is pas restricted
+                if (mod.grp === 'pas') {
+                  if (eligible({ grp: 'pas' })) {
+                    namedModules.push(mod); // Only add PAS if the slot is pas restricted
+                  } else {
+                    return; // skip PAS for non-pas slots
+                  }
+                } else {
+                  namedModules.push(mod);
+                }
               }
+            });
+
+            // If there's only one compact module, treat it as a named module instead
+            if (compactModules.length === 1) {
+              namedModules.push(compactModules[0]);
+              compactModules.length = 0;
+            }
+
+            // Nothing to render for this variant (e.g. a PAS-only sub-group on a
+            // non-PAS slot) -> skip its heading too.
+            if (compactModules.length === 0 && namedModules.length === 0) {
+              return;
+            }
+
+            // Sub-group heading
+            list.push(
+              <div key={`group-${groupKey}-${subIdx}`} className="module-separator cap">{heading}</div>
+            );
+
+            if (compactModules.length > 0) {
+              this._addCompactModulesAsGrid(compactModules, list, onSelect, eligible, warning, termtip, tooltip, translate, groupKey);
+            }
+            if (namedModules.length > 0) {
+              namedModules.forEach(mod => {
+                this._addModuleToList(mod, list, onSelect, eligible, warning, termtip, tooltip, translate);
+              });
             }
           });
-
-          // If there's only one compact module, treat it as a named module instead
-          if (compactModules.length === 1) {
-            namedModules.push(compactModules[0]);
-            compactModules.length = 0; // Clear the compact array
-          }
-
-          // Add compact modules as grid (only if there are multiple)
-          if (compactModules.length > 0) {
-            this._addCompactModulesAsGrid(compactModules, list, onSelect, eligible, warning, termtip, tooltip, translate, groupKey);
-          }
-
-          // Add named modules
-          if (namedModules.length > 0) {
-            namedModules.forEach(mod => {
-              this._addModuleToList(mod, list, onSelect, eligible, warning, termtip, tooltip, translate);
-            });
-          }
         });
       }
     });
+  }
+
+  /**
+   * Process favourite modules and render them with engineering info
+   * @param {Array} favourites Array of favourite module data objects
+   * @param {Array} list The list to push React elements into
+   * @param {Function} onSelect Module selection callback
+   * @param {Function} eligible Eligibility check function
+   * @param {Function} warning Warning check function
+   * @param {Function} termtip Tooltip function
+   * @param {Function} tooltip Tooltip hide function
+   * @param {Function} translate Translation function
+   */
+  _processFavouriteModules(favourites, list, onSelect, eligible, warning, termtip, tooltip, translate) {
+    if (!favourites || favourites.length === 0) {
+      list.push(
+        <div key="no-favourites" className="select-group" style={{ padding: '1em', color: '#999' }}>
+          No favourites in this category
+        </div>
+      );
+      return;
+    }
+
+    list.push(<div key="fav-header" className="select-group cap">Favourites</div>);
+
+    favourites.forEach((fav, index) => {
+      const favKey = `fav-${fav.grp}-${fav.id}-${index}`;
+      const classRating = fav.class && fav.rating ? `${fav.class}${fav.rating}` : '';
+      const moduleName = fav.name || fav.grp;
+
+      // Build engineering description
+      let engineeringDesc = '';
+      if (fav.blueprint && fav.blueprint.name) {
+        engineeringDesc = `G${fav.blueprint.grade} ${fav.blueprint.name}`;
+        if (fav.blueprint.special && fav.blueprint.special.name) {
+          engineeringDesc += ` + ${fav.blueprint.special.name}`;
+        }
+      }
+
+      // Mount icon
+      let mountIcon = null;
+      if (fav.mount) {
+        switch (fav.mount) {
+          case 'F': mountIcon = <MountFixed className="mount-icon" />; break;
+          case 'G': mountIcon = <MountGimballed className="mount-icon" />; break;
+          case 'T': mountIcon = <MountTurret className="mount-icon" />; break;
+        }
+      }
+
+      // Check eligibility
+      let validSlot = eligible ? eligible(fav) : true;
+
+      let classNames = cn({
+        'special-module': true,
+        'favourite-module': true,
+        'c': validSlot,
+        'disabled': !validSlot
+      });
+
+      // Handler to apply the favourite module with engineering
+      const selectFavourite = () => {
+        this._applyFavouriteModule(fav, onSelect);
+      };
+
+      // Handler to remove from favourites
+      const removeFavourite = (e) => {
+        e.stopPropagation();
+        Persist.removeFavourite(fav);
+        // Rebuild the list state after removing a favourite
+        const newState = this._initState(this.props, this.context);
+        this.setState(newState);
+      };
+
+      list.push(
+        <div key={favKey}
+             className={classNames}
+             tabIndex={validSlot ? '0' : ''}
+             onClick={validSlot ? selectFavourite : null}
+             onKeyDown={validSlot ? this._keyDown.bind(this, selectFavourite) : null}>
+          <div className="module-content favourite-content">
+            <div className="favourite-info">
+              {mountIcon && <span className="module-mount">{mountIcon}</span>}
+              <span className="module-text">{classRating} {translate(moduleName).toUpperCase()}</span>
+            </div>
+            {engineeringDesc && (
+              <div className="favourite-engineering">
+                {engineeringDesc}
+              </div>
+            )}
+            <div className="favourite-remove"
+                 onClick={removeFavourite}
+                 onMouseOver={termtip.bind(null, 'Remove from favourites')}
+                 onMouseOut={tooltip.bind(null, null)}>
+              <StarFilled className="star-icon star-filled" />
+            </div>
+          </div>
+        </div>
+      );
+    });
+  }
+
+  /**
+   * Apply a favourite module with its engineering to the current slot
+   * @param {Object} fav The favourite data object
+   * @param {Function} onSelect The module selection callback
+   */
+  _applyFavouriteModule(fav, onSelect) {
+    // For bulkheads, the onSelect expects an object with an 'index' property
+    // and the ship needs the mods applied after selection
+    if (fav.grp === 'bh') {
+      // Bulkhead IDs are string identifiers (e.g. "bY"), not numeric indices.
+      // Find the correct index by matching the id against available bulkheads.
+      const ship = this.props.ship;
+      let bulkheadIndex = null;
+      if (ship && ship.availCS && ship.availCS.bulkheads) {
+        bulkheadIndex = ship.availCS.bulkheads.findIndex(bh => bh.id === fav.id);
+      }
+      if (bulkheadIndex === null || bulkheadIndex < 0) return;
+
+      // Select the bulkhead by index first
+      onSelect({ index: bulkheadIndex });
+
+      // Now apply engineering mods to the installed bulkhead
+      if (ship && ship.bulkheads && ship.bulkheads.m) {
+        if (fav.mods && Object.keys(fav.mods).length > 0) {
+          ship.bulkheads.m.mods = JSON.parse(JSON.stringify(fav.mods));
+        }
+        if (fav.blueprint) {
+          ship.bulkheads.m.blueprint = {};
+          if (fav.blueprint.name) {
+            const blueprint = getBlueprint(fav.blueprint.fdname || fav.blueprint.name, ship.bulkheads.m);
+            if (blueprint) {
+              ship.bulkheads.m.blueprint = JSON.parse(JSON.stringify(blueprint));
+              ship.bulkheads.m.blueprint.grade = fav.blueprint.grade;
+            } else {
+              ship.bulkheads.m.blueprint.name = fav.blueprint.name;
+              ship.bulkheads.m.blueprint.fdname = fav.blueprint.fdname;
+              ship.bulkheads.m.blueprint.grade = fav.blueprint.grade;
+            }
+          }
+          if (fav.blueprint.special && fav.blueprint.special.edname) {
+            const special = Modifications.specials[fav.blueprint.special.edname];
+            if (special) {
+              ship.bulkheads.m.blueprint.special = special;
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    // Create a new Module instance from the favourite data
+    const mod = new Module({ grp: fav.grp, id: fav.id });
+    if (!mod) return;
+
+    // Apply the module first (this triggers ship.use via onSelect)
+    // We need to pre-apply the engineering data to the module before selecting it
+    if (fav.mods && Object.keys(fav.mods).length > 0) {
+      mod.mods = JSON.parse(JSON.stringify(fav.mods));
+    }
+
+    if (fav.blueprint) {
+      mod.blueprint = {};
+      if (fav.blueprint.name) {
+        // Reconstruct the blueprint object
+        const blueprint = getBlueprint(fav.blueprint.fdname || fav.blueprint.name, mod);
+        if (blueprint) {
+          mod.blueprint = JSON.parse(JSON.stringify(blueprint));
+          mod.blueprint.grade = fav.blueprint.grade;
+        } else {
+          mod.blueprint.name = fav.blueprint.name;
+          mod.blueprint.fdname = fav.blueprint.fdname;
+          mod.blueprint.grade = fav.blueprint.grade;
+        }
+      }
+      if (fav.blueprint.special && fav.blueprint.special.edname) {
+        const special = Modifications.specials[fav.blueprint.special.edname];
+        if (special) {
+          mod.blueprint.special = special;
+        }
+      }
+    }
+
+    // Select the module - this calls ship.use() which installs it in the slot
+    onSelect(mod);
   }
 
   /**
@@ -1084,7 +1339,72 @@ export default class AvailableModulesMenu extends TranslatedComponent {
 
     return categoryDisplayNames[categoryName] || categoryName.toUpperCase();
   }
-/**
+
+  /**
+   * Partition a module group into ordered variant sub-groups, each with its own
+   * heading. "Base" modules (ordinary modules whose display name is just the
+   * group, e.g. plain Thrusters) are kept together under `baseGroupName`; each
+   * distinctly-named variant family (e.g. "Enhanced Performance", "MkII Gravity
+   * Optimised Thrusters") gets its own sub-group/heading. Variant modules keep
+   * the module order they already have (the caller sorts class-desc/rating-asc);
+   * the base sub-group always renders first so ordinary modules lead the list.
+   *
+   * @param  {Array}  modules       Modules in the group (already sorted)
+   * @param  {String} groupKey      The module group key (e.g. 't')
+   * @param  {String} baseGroupName The group's own display name (e.g. 'Thrusters')
+   * @return {Array}  Ordered array of { heading, modules }
+   */
+  _partitionGroupVariants(modules, groupKey, baseGroupName) {
+    const base = [];
+    const variants = new Map(); // variantName -> modules[]
+
+    for (const mod of modules) {
+      const variant = this._getModuleVariantName(mod, groupKey, baseGroupName);
+      if (!variant) {
+        base.push(mod);
+      } else {
+        if (!variants.has(variant)) variants.set(variant, []);
+        variants.get(variant).push(mod);
+      }
+    }
+
+    const result = [];
+    if (base.length > 0) {
+      result.push({ heading: baseGroupName, modules: base });
+    }
+    for (const [heading, mods] of variants) {
+      result.push({ heading, modules: mods });
+    }
+    return result;
+  }
+
+  /**
+   * Determine the variant sub-group heading for a module, or null if the module
+   * belongs to the group's "base" set (rendered under the group's own name).
+   *
+   * A variant is a specially-named family within a group that should be shown
+   * under its own heading - currently the named thruster families (Enhanced
+   * Performance and the ship-specific "Mk II ..." thrusters). Ordinary thrusters
+   * (whose data name is empty or just "<class><rating>") are base modules.
+   *
+   * @param  {Object} mod            The module
+   * @param  {String} groupKey       The group key (e.g. 't')
+   * @param  {String} baseGroupName  The group's own display name
+   * @return {String|null}           Variant heading, or null for base modules
+   */
+  _getModuleVariantName(mod, groupKey, baseGroupName) {
+    if (!mod || !mod.name) return null; // unnamed -> ordinary module
+    const name = mod.name.trim();
+    // A name that is just "<class><rating>" (e.g. "5A") is an ordinary module.
+    if (mod.class && mod.rating && name === `${mod.class}${mod.rating}`) return null;
+    // A name identical to the group's own display name is not a distinct variant.
+    if (name === baseGroupName) return null;
+    // Otherwise the module's own (friendly) name is its variant heading, e.g.
+    // "Enhanced Performance" or "MkII Gravity Optimised Thrusters".
+    return name;
+  }
+
+  /**
    * Get friendly display name for module group keys
    */
   _getGroupDisplayName(groupKey, modules) {
@@ -1160,8 +1480,11 @@ export default class AvailableModulesMenu extends TranslatedComponent {
       'rsl': 'Research Limpet Controller',
       'rcpl': 'Recon Limpet Controller',
       'dtl': 'Decontamination Limpet Controller',
-      'fh': 'Fighter Hangar',
+      'fh': 'Vessel Hangar',
+      'fhmkii': 'Mk II Vessel Hangar',
       'pv': 'Planetary Vehicle Hangar',
+      'lpv': 'Large Planetary Vehicle Hangar',
+      'lpvmkii': 'Mk II Large Planetary Vehicle Hangar',
       'fs': 'Fuel Scoop',
       'ft': 'Fuel Tank',
       'hr': 'Hull Reinforcement Package',
@@ -1174,6 +1497,7 @@ export default class AvailableModulesMenu extends TranslatedComponent {
 
       // Standard modules
       'pp': 'Power Plant',
+      't': 'Thrusters',
       'th': 'Thrusters',
       'fsd': 'Frame Shift Drive',
       'ls': 'Life Support',
@@ -1690,22 +2014,73 @@ export default class AvailableModulesMenu extends TranslatedComponent {
   }
 
   /**
+   * Toggle between favourites mode and normal modules
+   */
+  _toggleFavouritesMode() {
+    this.setState(prev => {
+      const newMode = !prev.favouritesMode;
+      if (newMode) {
+        // Switching to favourites mode - build the favourites list
+        const { termtip, tooltip, language } = this.context;
+        const { onSelect, eligible, warning } = this.props;
+        const translate = language.translate;
+        const favourites = this._getSlotFavourites();
+        const list = [];
+        this._processFavouriteModules(favourites, list, onSelect, eligible, warning, termtip, tooltip, translate);
+        return { favouritesMode: true, favouritesList: list };
+      } else {
+        // Switching back to normal mode
+        return { favouritesMode: false, favouritesList: null };
+      }
+    });
+  }
+
+  /**
+   * Get favourites that are valid for this slot's module groups
+   * @return {Array} Filtered favourites
+   */
+  _getSlotFavourites() {
+    const { modules, eligible } = this.props;
+    const favourites = Persist.getFavourites();
+
+    // Build a set of valid module groups from the modules prop
+    const validGroups = new Set();
+    if (Array.isArray(modules)) {
+      modules.forEach(mod => { if (mod && mod.grp) validGroups.add(mod.grp); });
+    } else if (typeof modules === 'object') {
+      Object.keys(modules).forEach(groupKey => {
+        validGroups.add(groupKey);
+      });
+    }
+
+    return favourites.filter(fav => {
+      if (!fav || !fav.grp) return false;
+      if (validGroups.size > 0 && !validGroups.has(fav.grp)) return false;
+      if (eligible && !eligible(fav)) return false;
+      return true;
+    });
+  }
+
+  /**
    * Render component
    * @return {Object} React component
    */
   render() {
-    let { className, selectedCategory, onBack } = this.props;
-    let { list, searchQuery } = this.state;
+    let { className, selectedCategory, onBack, hideSearch } = this.props;
+    let { list, searchQuery, favouritesMode, favouritesList } = this.state;
 
     let classes = cn('select', className);
 
     // Determine if we should show search box
     // Show for optional internal, hardpoint, and utility slots (not for standard/core modules)
     const isCoreInternal = className && className.includes('standard');
-    const showSearch = !isCoreInternal;
+    const showSearch = !isCoreInternal && !hideSearch;
 
     // Show back button if a category is selected
     const showBackButton = selectedCategory && onBack;
+
+    // For core/standard slots, check if there are relevant favourites
+    const hasFavourites = isCoreInternal && this._getSlotFavourites().length > 0;
 
     return (
       <div className={classes}
@@ -1736,10 +2111,25 @@ export default class AvailableModulesMenu extends TranslatedComponent {
               value={searchQuery}
               onChange={this._handleSearchChange}
               onClick={(e) => e.stopPropagation()}
+              autoFocus={this.context.noTouch}
             />
           </div>
         )}
-        {list}
+        {hasFavourites && (
+          <div
+            className={cn('favourites-toggle', { active: favouritesMode })}
+            tabIndex="0"
+            onClick={(e) => {
+              e.stopPropagation();
+              this._toggleFavouritesMode();
+            }}
+          >
+            <span className="favourites-toggle-text">
+              {favouritesMode ? <span><Reload className="favourites-toggle-icon" /> Modules</span> : '★ Favourites'}
+            </span>
+          </div>
+        )}
+        {favouritesMode && favouritesList ? favouritesList : list}
       </div>
     );
   }

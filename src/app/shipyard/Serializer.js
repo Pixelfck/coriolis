@@ -1,6 +1,8 @@
 import { ModuleGroupToName, MountMap, BulkheadNames } from './Constants';
-import { Ships } from 'coriolis-data/dist';
+import { Ships, Modifications } from 'coriolis-data/dist';
+import Module from './Module';
 import Ship from './Ship';
+import * as Calc from './Calculations';
 import * as Utils from '../utils/UtilityFunctions';
 import LZString from 'lz-string';
 import { outfitURL } from '../utils/UrlGenerators';
@@ -43,8 +45,11 @@ function standardToSchema(standard) {
  * @return {Object}           JSON Schema Bulkhead
  */
 function bulkheadToSchema(bulkheads) {
+  // Prefer the fitted bulkhead's own name (ships like the Caspian Explorer and
+  // Anaconda Mk II carry ship-specific 'Mk II Ablative ...' armours at indices
+  // beyond the 5 standard grades, for which BulkheadNames has no entry).
   let o = {
-    name: BulkheadNames[bulkheads.m.index]
+    name: (bulkheads.m && bulkheads.m.name) || BulkheadNames[bulkheads.m.index]
   };
 
   if (bulkheads.m.mods && Object.keys(bulkheads.m.mods).length > 0) {
@@ -107,7 +112,7 @@ export function toDetailedBuild(buildName, ship) {
       code = ship.toString();
 
   let data = {
-    $schema: 'https://coriolis.io/schemas/ship-loadout/4.json#',
+    $schema: 'https://coriolis.io/schemas/ship-loadout/5.json#',
     name: buildName,
     ship: ship.name,
     references: [{
@@ -139,6 +144,20 @@ export function toDetailedBuild(buildName, ship) {
     if (!isNaN(ship[stat])) {
       data.stats[stat] = Math.round(ship[stat] * 100) / 100;
     }
+  }
+
+  // Override jump range stats with the same calculations the UI uses
+  // (ShipSummaryTable.jsx computes these inline rather than using the
+  // stored ship properties, so the stored values can differ)
+  const fsd = ship.standard[2].m;
+  if (fsd) {
+    const fsdMaxFuel = fsd instanceof Module ? fsd.getMaxFuelPerJump() : fsd.maxfuel;
+    data.stats.unladenRange = Math.round(Calc.jumpRange(ship.unladenMass, fsd, ship.fuelCapacity, ship) * 100) / 100;
+    data.stats.fullTankRange = Math.round(Calc.jumpRange(ship.unladenMass, fsd, ship.fuelCapacity, ship) * 100) / 100;
+    data.stats.ladenRange = Math.round(Calc.jumpRange(ship.unladenMass + ship.cargoCapacity, fsd, ship.fuelCapacity, ship) * 100) / 100;
+    data.stats.maxRange = Math.round(Calc.jumpRange(ship.unladenMass - ship.fuelCapacity + fsdMaxFuel, fsd, fsdMaxFuel, ship) * 100) / 100;
+    data.stats.unladenFastestRange = Math.round(Calc.totalJumpRange(ship.unladenMass, fsd, ship.fuelCapacity, ship) * 100) / 100;
+    data.stats.ladenFastestRange = Math.round(Calc.totalJumpRange(ship.unladenMass + ship.cargoCapacity, fsd, ship.fuelCapacity, ship) * 100) / 100;
   }
 
   return data;
@@ -217,6 +236,107 @@ export function toComparison(code) {
 };
 
 /**
+ * Build a reverse mapping from Coriolis internal attribute names to FD label names.
+ * Some internal names map to multiple FD labels (e.g. 'optmass' → FSDOptimalMass,
+ * EngineOptimalMass, ShieldGenOptimalMass). We pick the first match since the
+ * Modifiers array only needs one label per attribute.
+ */
+const _internalToFdLabel = {};
+for (const [fdLabel, actions] of Object.entries(Modifications.modifierActions)) {
+  // Skip special effects — they start with 'special_' or 'trade_'
+  if (fdLabel.startsWith('special_') || fdLabel.startsWith('trade_')) continue;
+  for (const internalName of Object.keys(actions)) {
+    if (!_internalToFdLabel[internalName]) {
+      _internalToFdLabel[internalName] = fdLabel;
+    }
+  }
+}
+
+/**
+ * Build the Modifiers array for a module's engineering, using the actual
+ * modified values that Coriolis has computed (matching what the UI shows).
+ *
+ * @param  {Object} m  The module (with .mods, base values, etc.)
+ * @return {Array}     Array of {Label, Value, OriginalValue, LessIsGood} objects, or null
+ */
+function _buildModifiers(m) {
+  if (!m || !m.mods || Object.keys(m.mods).length === 0) return null;
+
+  const modifiers = [];
+  for (const [attrName, modValue] of Object.entries(m.mods)) {
+    const modification = Modifications.modifications[attrName];
+    if (!modification) continue;
+    // Skip hidden/object modifications (like damagedist)
+    if (modification.hidden || modification.type === 'object') continue;
+
+    const fdLabel = _internalToFdLabel[attrName];
+    if (!fdLabel) continue;
+
+    const baseValue = m[attrName];
+    if (baseValue === undefined || baseValue === null) continue;
+
+    // Get the modified value using the Module's getter if available
+    let modifiedValue;
+    if (m instanceof Module) {
+      modifiedValue = m.get(attrName, true);
+    } else {
+      // Fallback: compute from the stored mod
+      if (modification.type === 'percentage') {
+        modifiedValue = baseValue * (1 + modValue / 10000);
+      } else if (modification.type === 'numeric') {
+        if (modification.method === 'additive') {
+          modifiedValue = baseValue + modValue / 100;
+        } else {
+          modifiedValue = modValue / 100;
+        }
+      } else {
+        modifiedValue = baseValue;
+      }
+    }
+
+    if (modifiedValue === null || isNaN(modifiedValue)) continue;
+
+    modifiers.push({
+      Label: fdLabel.replace('OutfittingFieldType_', ''),
+      Value: Math.round(modifiedValue * 1000000) / 1000000,
+      OriginalValue: Math.round(baseValue * 1000000) / 1000000,
+      LessIsGood: modification.higherbetter === false ? 1 : 0
+    });
+  }
+
+  return modifiers.length > 0 ? modifiers : null;
+}
+
+/**
+ * Build the Engineering object for a module's SLEF export, including
+ * Modifiers (actual computed values) and PreEngineeredBlueprints for
+ * modules with multiple pre-engineered blueprints.
+ *
+ * @param  {Object} m  The module
+ * @return {Object|null} Engineering object or null if no engineering
+ */
+function _buildEngineering(m) {
+  if (!m || !m.blueprint || Object.keys(m.blueprint).length === 0) return null;
+
+  const eng = {
+    BlueprintName: m.blueprint.fdname,
+    Level: m.blueprint.grade,
+    Quality: m.blueprint.quality || 1
+  };
+
+  if (m.blueprint.special && m.blueprint.special.id >= 0) {
+    eng.ExperimentalEffect = m.blueprint.special.edname;
+  }
+
+  const modifiers = _buildModifiers(m);
+  if (modifiers) {
+    eng.Modifiers = modifiers;
+  }
+
+  return eng;
+}
+
+/**
  * Generates an object conforming to the SLEF (Ship Loadout Export Format) from a Ship model
  * SLEF spec: https://inara.cz/elite/inara-impexp-slef/
  * @param  {string} buildName The build name
@@ -252,15 +372,9 @@ export function toSLEF(buildName, ship) {
       Priority: ship.bulkheads.priority
     };
 
-    if (ship.bulkheads.m.blueprint && Object.keys(ship.bulkheads.m.blueprint).length > 0) {
-      module.Engineering = {
-        BlueprintName: ship.bulkheads.m.blueprint.fdname,
-        Level: ship.bulkheads.m.blueprint.grade,
-        Quality: ship.bulkheads.m.blueprint.quality || 1
-      };
-      if (ship.bulkheads.m.blueprint.special && ship.bulkheads.m.blueprint.special.id >= 0) {
-        module.Engineering.ExperimentalEffect = ship.bulkheads.m.blueprint.special.edname;
-      }
+    const bhEng = _buildEngineering(ship.bulkheads.m);
+    if (bhEng) {
+      module.Engineering = bhEng;
     }
 
     modules.push(module);
@@ -285,15 +399,9 @@ export function toSLEF(buildName, ship) {
         Priority: slot.priority
       };
 
-      if (slot.m.blueprint && Object.keys(slot.m.blueprint).length > 0) {
-        module.Engineering = {
-          BlueprintName: slot.m.blueprint.fdname,
-          Level: slot.m.blueprint.grade,
-          Quality: slot.m.blueprint.quality || 1
-        };
-        if (slot.m.blueprint.special && slot.m.blueprint.special.id >= 0) {
-          module.Engineering.ExperimentalEffect = slot.m.blueprint.special.edname;
-        }
+      const eng = _buildEngineering(slot.m);
+      if (eng) {
+        module.Engineering = eng;
       }
 
       modules.push(module);
@@ -319,15 +427,9 @@ export function toSLEF(buildName, ship) {
         Priority: slot.priority
       };
 
-      if (slot.m.blueprint && Object.keys(slot.m.blueprint).length > 0) {
-        module.Engineering = {
-          BlueprintName: slot.m.blueprint.fdname,
-          Level: slot.m.blueprint.grade,
-          Quality: slot.m.blueprint.quality || 1
-        };
-        if (slot.m.blueprint.special && slot.m.blueprint.special.id >= 0) {
-          module.Engineering.ExperimentalEffect = slot.m.blueprint.special.edname;
-        }
+      const eng = _buildEngineering(slot.m);
+      if (eng) {
+        module.Engineering = eng;
       }
 
       modules.push(module);
@@ -339,7 +441,8 @@ export function toSLEF(buildName, ship) {
     'Military': 'Military',
     'Limpets': 'LimpetController',
     'Fighter': 'FighterBay',
-    'Cargo': 'Cargo'
+    'Cargo': 'Cargo',
+    'MkIIPassenger': 'Passenger'
   };
   let slotNum = 1;
   const namedSlotCounters = {};
@@ -366,20 +469,32 @@ export function toSLEF(buildName, ship) {
         Priority: slot.priority
       };
 
-      if (slot.m.blueprint && Object.keys(slot.m.blueprint).length > 0) {
-        module.Engineering = {
-          BlueprintName: slot.m.blueprint.fdname,
-          Level: slot.m.blueprint.grade,
-          Quality: slot.m.blueprint.quality || 1
-        };
-        if (slot.m.blueprint.special && slot.m.blueprint.special.id >= 0) {
-          module.Engineering.ExperimentalEffect = slot.m.blueprint.special.edname;
-        }
+      const eng = _buildEngineering(slot.m);
+      if (eng) {
+        module.Engineering = eng;
       }
 
       modules.push(module);
     }
   });
+
+  // Calculated top-level values. Spansh (and other journal-Loadout consumers)
+  // require these alongside the module list; without them parsing fails with
+  // "cannot parse ship". They mirror the fields Frontier writes into a journal
+  // Loadout event.
+  const hullValue = Math.round(ship.hullCost);
+  const modulesValue = Math.round(ship.totalCost - ship.hullCost);
+  // Elite's rebuy is 5% of the total ship value (hull + modules), floored.
+  const rebuy = Math.floor((hullValue + modulesValue) * 0.05);
+
+  // Maximum single-jump range, computed exactly as the UI / detailed-build
+  // export does: empty of cargo, with only the FSD's max fuel-per-jump aboard.
+  let maxJumpRange = 0;
+  const fsd = ship.standard[2] && ship.standard[2].m;
+  if (fsd) {
+    const fsdMaxFuel = fsd instanceof Module ? fsd.getMaxFuelPerJump() : fsd.maxfuel;
+    maxJumpRange = Calc.jumpRange(ship.unladenMass - ship.fuelCapacity + fsdMaxFuel, fsd, fsdMaxFuel, ship);
+  }
 
   return [{
     header: {
@@ -388,7 +503,23 @@ export function toSLEF(buildName, ship) {
       appURL: 'https://coriolis.io' + outfitURL(ship.id, ship.toString(), buildName)
     },
     data: {
-      Ship: shipFdName,
+      // Frontier journal Loadout events use the LOWERCASE internal ship name
+      // (e.g. 'explorer_nx', 'krait_mkii'); Spansh and other consumers key on
+      // exactly this. SHIP_FD_NAME_TO_CORIOLIS_NAME uses mixed-case keys, so
+      // lowercase it here.
+      Ship: shipFdName.toLowerCase(),
+      ShipName: '',
+      ShipIdent: '',
+      HullValue: hullValue,
+      ModulesValue: modulesValue,
+      UnladenMass: Math.round(ship.unladenMass * 100) / 100,
+      CargoCapacity: ship.cargoCapacity,
+      MaxJumpRange: Math.round(maxJumpRange * 100000) / 100000,
+      FuelCapacity: {
+        Main: ship.fuelCapacity,
+        Reserve: ship.reserveFuelCapacity
+      },
+      Rebuy: rebuy,
       Modules: modules
     }
   }];

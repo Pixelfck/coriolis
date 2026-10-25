@@ -8,6 +8,8 @@ import * as _ from 'lodash';
 import isEqual from 'lodash/lang';
 import { Ships, Modifications } from 'coriolis-data/dist';
 import { chain } from 'lodash';
+import { needsInternalMigration, OLD_INTERNAL_LAYOUTS, remapInternalArray, remapInternalParallel,
+         needsHardpointMigration, OLD_HARDPOINT_LAYOUTS, remapHardpointArray, remapHardpointParallel } from './LinkMigration';
 const zlib = require('zlib');
 
 const UNIQUE_MODULES = ['psg', 'sg', 'bsg', 'rf', 'fs', 'fh', 'gfsb', 'dc', 'ews', 'mlc'];
@@ -85,11 +87,6 @@ export default class Ship {
 
     for (let p in properties) { this[p] = properties[p]; }  // Copy all base properties from shipData
 
-    // DEBUG
-    if (id === 'imperial_courier') {
-      console.log('Imperial Courier constructor - minthrust:', this.minthrust, 'properties.minthrust:', properties.minthrust);
-    }
-
     for (let slotType in slots) {   // Initialize all slots
       // small counter to keep track of the slot indexes
       const slotCounter = new Map();
@@ -126,6 +123,10 @@ export default class Ship {
               slotIndex: slotCounter.get(currentSlotType).length,
               maxClass: slot.class,
               eligible: slot.eligible,
+              // Pass through the optional MVR opt-in flag so slot-specific
+              // Mining Volley Repeater eligibility (e.g. the Anaconda Mk II's
+              // two lower Large hardpoints) survives onto the slot object.
+              mvr: slot.mvr,
             });
           }
         } else {
@@ -364,7 +365,7 @@ export default class Ship {
    */
   toString() {
     return [
-      'A',
+      'B',
       this.getStandardString(),
       this.getHardpointsString(),
       this.getInternalString(),
@@ -446,13 +447,18 @@ export default class Ship {
    * Recalculate all item costs and total based on discounts.
    * @param  {Number} shipDiscount      Ship cost discount (e.g. 0.1 === 10% discount)
    * @param  {Number} moduleDiscount    Module cost discount (e.g. 0.75 === 25% discount)
+   * @param  {Object} [rolls]           Map of engineering grade -> rolls (matsPerGrade)
+   *                                     used to cost Merc Coin engineering. Defaults to
+   *                                     one roll per grade when omitted.
    * @return {this} The current ship instance for chaining
    */
-  applyDiscounts(shipDiscount, moduleDiscount) {
+  applyDiscounts(shipDiscount, moduleDiscount, rolls) {
     let shipCostMultiplier = 1 - shipDiscount;
     let moduleCostMultiplier = 1 - moduleDiscount;
     let total = 0;
+    let totalMercCoin = 0;
     let costList = this.costList;
+    this.mercCoinRolls = rolls;
 
     for (let i = 0, l = costList.length; i < l; i++) {
       let item = costList[i];
@@ -462,9 +468,17 @@ export default class Ship {
           total += item.discountedCost;
         }
       }
+      // Merc Coin is a separate in-game currency with no discount concept.
+      // It covers both the module's purchase price and any Merc Coin spent
+      // engineering it. Merc Coin modules typically have a credit cost of 0,
+      // so they are handled independently of the credit total above.
+      if (item.m && item.incCost && item.type !== 'SHIP' && item.m.getTotalMercCoin) {
+        totalMercCoin += item.m.getTotalMercCoin(rolls);
+      }
     }
     this.moduleCostMultiplier = moduleCostMultiplier;
     this.totalCost = total;
+    this.totalMercCoin = totalMercCoin;
     return this;
   }
 
@@ -494,7 +508,7 @@ export default class Ship {
    */
   setModuleBlueprint(m, bp) {
     // Check if this is a pre-engineered module that cannot be re-engineered
-    if (m.preEngineered && !m.preEngineered.reengineerable) {
+    if (m.preEngineered && !m.preEngineered.reengineerable && !m.preEngineered.gradeChangeable) {
       // Don't allow changing the blueprint on a locked pre-engineered module
       return;
     }
@@ -506,7 +520,13 @@ export default class Ship {
       const features = m.blueprint.grades[m.blueprint.grade].features;
       for (const featureName in features) {
         if (Modifications.modifications[featureName].hidden) {
-          this.setModification(m, featureName, bp.grades[bp.grade].features[featureName][0]);
+          const featureValue = features[featureName];
+          // Object-type features (e.g. damagedist) are stored directly, not as [min, max] arrays
+          if (Modifications.modifications[featureName].type === 'object') {
+            this.setModification(m, featureName, featureValue);
+          } else {
+            this.setModification(m, featureName, featureValue[0]);
+          }
         }
       }
     }
@@ -530,8 +550,109 @@ export default class Ship {
   }
 
   /**
+   * Normalize the blueprints list from preEngineered data.
+   * Handles both array format (from JSON) and legacy comma-separated string format.
+   * @param  {Array|String} blueprints  The blueprints field from preEngineered
+   * @return {Array}                    Array of blueprint name strings
+   */
+  _normalizeBlueprintNames(blueprints) {
+    if (Array.isArray(blueprints)) {
+      return blueprints;
+    }
+    // Legacy format: comma-separated string
+    return _.split(blueprints, ',').map(s => s.trim());
+  }
+
+  /**
+   * Apply pre-engineered modifiers to a module. This is the single unified
+   * code path for all pre-engineered module handling.
+   *
+   * If the module has explicit modifiers (bespoke tech-broker values), those
+   * are applied directly. Otherwise falls through to standard blueprint grade
+   * computation via setQualityCB.
+   *
+   * @param  {Object}  m              The module with preEngineered data
+   * @param  {Object}  [options]      Options
+   * @param  {boolean} [options.force=false]          Pass true to force setModification (bypasses grp check)
+   * @param  {boolean} [options.preventUpdate=false]  Pass true to prevent stat recalculation (used during buildWith)
+   * @param  {boolean} [options.clearFirst=false]     Pass true to clear existing mods before applying
+   * @param  {boolean} [options.setupBlueprint=false] Pass true to create blueprint structure from scratch (fresh module)
+   * @return {boolean} True if modifiers were applied, false if module is not pre-engineered
+   */
+  _applyPreEngineeredModifiers(m, options = {}) {
+    const { force = false, preventUpdate = false, clearFirst = false, setupBlueprint = false } = options;
+
+    if (!m.preEngineered || !m.preEngineered.blueprints || m.preEngineered.blueprints.length === 0) {
+      return false;
+    }
+
+    const blueprintNames = this._normalizeBlueprintNames(m.preEngineered.blueprints);
+    const grade = m.preEngineered.grade || 5;
+
+    // Set up blueprint structure if requested (fresh module with no saved blueprint)
+    if (setupBlueprint) {
+      m.blueprint = {};
+      const primaryBpName = blueprintNames[0];
+      m.blueprint.fdname = primaryBpName;
+      m.blueprint.grade = grade;
+      if (Modifications.blueprints[primaryBpName]) {
+        m.blueprint.grades = Modifications.blueprints[primaryBpName].grades;
+        m.blueprint.name = Modifications.blueprints[primaryBpName].name;
+      }
+
+      // Apply experimental effect
+      if (m.preEngineered.experimentalEffects && m.preEngineered.experimentalEffects.length > 0) {
+        const specialName = m.preEngineered.experimentalEffects[0];
+        const special = _.find(Modifications.specials, o => o.edname === specialName);
+        if (special) {
+          m.blueprint.special = special;
+        }
+      }
+    }
+
+    // Clear existing modifications if requested
+    if (clearFirst) {
+      m.mods = {};
+    }
+
+    // PATH A: Explicit modifiers (bespoke tech-broker values)
+    if (m.preEngineered.modifiers) {
+      for (const featureName in m.preEngineered.modifiers) {
+        const modification = Modifications.modifications[featureName];
+        if (!modification) continue;
+
+        let value = m.preEngineered.modifiers[featureName];
+
+        // Convert to internal format
+        if (modification.type === 'percentage') {
+          value = value * 10000;
+        } else if (modification.type === 'numeric') {
+          value = value * 100;
+        }
+
+        this.setModification(m, featureName, value, false, preventUpdate, force);
+      }
+      return true;
+    }
+
+    // PATH B: Compute from blueprint grades via setQualityCB (standard pre-engineered)
+    for (const blueprintName of blueprintNames) {
+      const blueprint = getBlueprint(blueprintName, m);
+      if (blueprint) {
+        blueprint.grade = grade;
+        setQualityCB(blueprint, 1, (featureName, value) => {
+          const currentMod = m.getModValue(featureName, true) || 0;
+          this.setModification(m, featureName, currentMod + value, false, preventUpdate, force);
+        });
+      }
+    }
+    return true;
+  }
+
+  /**
    * Initialize pre-engineered module blueprints
-   * This applies all the pre-configured blueprints to a pre-engineered module
+   * This applies all the pre-configured blueprints to a pre-engineered module.
+   * Used when a pre-engineered module is first selected in the outfitting UI.
    * @param  {Object} m      The pre-engineered module to initialize
    */
   initializePreEngineeredModule(m) {
@@ -539,63 +660,12 @@ export default class Ship {
       return; // Not a pre-engineered module
     }
 
-    // Initialize the blueprint object if it doesn't exist
-    if (!m.blueprint || !m.blueprint.name) {
-      m.blueprint = {};
-    }
-
-    // Apply each blueprint in sequence
-    for (let i = 0; i < m.preEngineered.blueprints.length; i++) {
-      const blueprintName = m.preEngineered.blueprints[i];
-      const blueprint = getBlueprint(blueprintName, m);
-
-      if (!blueprint || !blueprint.grades) {
-        continue;
-      }
-
-      const grade = m.preEngineered.grade || 5;
-
-      // For the first blueprint, set up the blueprint structure
-      if (i === 0) {
-        m.blueprint = JSON.parse(JSON.stringify(blueprint));
-        m.blueprint.grade = grade;
-      }
-
-      // Apply the modifications from this blueprint at the specified grade
-      if (blueprint.grades[grade] && blueprint.grades[grade].features) {
-        const features = blueprint.grades[grade].features;
-
-        for (const featureName in features) {
-          const modification = Modifications.modifications[featureName];
-          if (!modification) continue;
-
-          // Get the feature value (use best value for pre-engineered)
-          let value = features[featureName][1]; // Best value
-
-          // Convert to internal format
-          if (modification.type === 'percentage') {
-            value = value * 10000;
-          } else if (modification.type === 'numeric') {
-            value = value * 100;
-          }
-
-          // Apply the modification
-          if (modification.hidden) {
-            this.setModification(m, featureName, value, false);
-          } else {
-            this.setModification(m, featureName, value, false);
-          }
-        }
-      }
-    }
-
-    // Apply experimental effect if specified
-    if (m.preEngineered.experimentalEffects && m.preEngineered.experimentalEffects.length > 0) {
-      const specialName = m.preEngineered.experimentalEffects[0];
-      if (Modifications.specials[specialName]) {
-        m.blueprint.special = Modifications.specials[specialName];
-      }
-    }
+    // Set up blueprint structure and apply modifiers.
+    // force: true is required because pre-engineered modules apply their own
+    // baked-in modifiers, which must bypass the per-group user-engineering
+    // allow-list (that list is intentionally empty for modules like the
+    // Guardian weapons, which cannot be manually engineered).
+    this._applyPreEngineeredModifiers(m, { setupBlueprint: true, force: true });
   }
 
   /**
@@ -609,26 +679,7 @@ export default class Ship {
 
       // For pre-engineered modules, we need to re-apply ALL base blueprints cumulatively
       if (m.preEngineered && m.preEngineered.blueprints) {
-        this.clearModifications(m);
-        const blueprintNames = _.split(m.preEngineered.blueprints, ',');
-
-        // Apply all blueprints cumulatively
-        for (const blueprintName of blueprintNames) {
-          const blueprint = getBlueprint(blueprintName.trim(), m);
-          if (blueprint) {
-            // Pre-engineered modules are always grade 5, except for heatsinks and Abrasion Blasters and MC's, which are grade 1
-            if (m.symbol === 'Hpt_HeatSinkLauncher_Turret_Tiny' || m.symbol === 'Hpt_Mining_AbrBlstr_Fixed_Small' || m.symbol === 'Hpt_MultiCannon_Fixed_Medium') {
-              blueprint.grade = 1; // Heatsinks and Abrasion Blasters and MC's are always Grade 1
-            } else {
-              blueprint.grade = 5; // Pre-engineered are always Grade 5
-            }
-            setQualityCB(blueprint, 1, (featureName, value) => {
-              // Add modifications cumulatively for pre-engineered modules
-              const currentMod = m.getModValue(featureName, true) || 0;
-              this.setModification(m, featureName, currentMod + value, false, true);
-            });
-          }
-        }
+        this._applyPreEngineeredModifiers(m, { clearFirst: true, preventUpdate: true });
       }
     }
 
@@ -676,15 +727,20 @@ export default class Ship {
       m.mods = {};
     }
 
-    if (isNaN(value)) {
-      // Value passed is invalid; reset it to 0
-      value = 0;
-    }
-
-    if (isAbsolute) {
-      m.setPretty(name, value, isAbsolute);
-    } else {
+    if (Modifications.modifications[name] && Modifications.modifications[name].type === 'object') {
+      // Object-type modifications (e.g. damagedist) are stored directly, not as numbers
       m.setModValue(name, value, false);
+    } else {
+      if (isNaN(value)) {
+        // Value passed is invalid; reset it to 0
+        value = 0;
+      }
+
+      if (isAbsolute) {
+        m.setPretty(name, value, isAbsolute);
+      } else {
+        m.setModValue(name, value, false);
+      }
     }
 
     if (preventUpdate) {
@@ -732,6 +788,12 @@ export default class Ship {
     } else if (name === 'engcap') {
       // Might have resulted in a change in boostability
       this.updateMovement();
+    } else if (name === 'cargo') {
+      // Cargo capacity affects the ship's total cargo and its laden mass,
+      // which in turn affects movement and jump range
+      this.recalculateMass();
+      this.updateMovement();
+      this.updateJumpStats();
     }
   }
 
@@ -760,6 +822,7 @@ export default class Ship {
     this.shield = this.baseShieldStrength;
     this.shieldCells = 0;
     this.totalCost = this.m.incCost ? this.m.discountedCost : 0;
+    this.totalMercCoin = 0;
     this.dryMass = this.hullMass;
     this.unladenMass = this.hullMass;
     this.totalDpe = 0;
@@ -815,71 +878,14 @@ export default class Ship {
             module.blueprint.special = blueprints[i + 1].special;
             // For pre-engineered modules, clear and re-apply ALL blueprints cumulatively
             if (module.preEngineered && module.preEngineered.blueprints) {
-              this.clearModifications(module, true); // Prevent stat update
-              const blueprintNames = _.split(module.preEngineered.blueprints, ',');
-              for (const blueprintName of blueprintNames) {
-                const blueprint = getBlueprint(blueprintName.trim(), module);
-                if (blueprint) {
-                  // Pre-engineered modules are always grade 5, except for heatsinks, Abrasion Blasters and MC's, which are grade 1
-                  if (module.symbol === 'Hpt_HeatSinkLauncher_Turret_Tiny' || module.symbol === 'Hpt_Mining_AbrBlstr_Fixed_Small' || module.symbol === 'Hpt_MultiCannon_Fixed_Medium') {
-                    blueprint.grade = 1; // Heatsinks and Abrasion Blasters and MC's are always Grade 1
-                  } else {
-                    blueprint.grade = 5; // Pre-engineered are always Grade 5
-                  }
-                  setQualityCB(blueprint, 1, (featureName, value) => {
-                    // Add modifications cumulatively for pre-engineered modules
-                    const currentMod = module.getModValue(featureName, true) || 0;
-                    this.setModification(module, featureName, currentMod + value, false, true, true);
-                  });
-                }
-              }
+              this._applyPreEngineeredModifiers(module, { clearFirst: true, preventUpdate: true, force: true });
             }
             // Regular modules: saved mods are already loaded and correct
           } else if (module.preEngineered && module.preEngineered.blueprints) {
-            // console.log('Pre-engineered module detected:', module.symbol, module.preEngineered);
-            // This is a pre-engineered module with no saved blueprint, so create the default blueprint structure
-            module.blueprint = {};
-            module.blueprint.fdname = _.split(module.preEngineered.blueprints, ',')[0].trim();
-            // Pre-engineered modules can be different grades
-            module.blueprint.grade = module.preEngineered.grade;
-            module.blueprint.grades = Modifications.blueprints[module.blueprint.fdname].grades;
-            module.blueprint.name = Modifications.blueprints[module.blueprint.fdname].name;
-
-            // If the pre-engineered module has a default experimental effect, apply it
-            if (module.preEngineered.experimentalEffects && module.preEngineered.experimentalEffects.length > 0) {
-              const specialName = module.preEngineered.experimentalEffects[0];
-              const special = _.find(Modifications.specials, o => o.edname === specialName);
-              if (special) {
-                module.blueprint.special = special;
-              }
-            }
-            // console.log('Created blueprint structure:', module.blueprint);
-            // Apply the default blueprints cumulatively using the same logic as setModuleSpecial
-            const blueprintNames = _.split(module.preEngineered.blueprints, ',');
-            // console.log('Blueprint names to apply:', blueprintNames);
-            for (const blueprintName of blueprintNames) {
-              // console.log('Processing blueprint:', blueprintName.trim());
-              const blueprint = getBlueprint(blueprintName.trim(), module);
-              // console.log('Got blueprint object:', blueprint);
-              if (blueprint && blueprint.grades && blueprint.grades[5]) {
-                // console.log('Blueprint has grade 5, features:', blueprint.grades[5].features);
-                // Apply each feature from this blueprint's grade 5 modifications
-                const features = blueprint.grades[5].features;
-                if (features) {
-                  for (const featureName in features) {
-                    const value = features[featureName][0]; // Grade 5 value
-                    // Add modifications cumulatively for pre-engineered modules
-                    const currentMod = module.getModValue(featureName, true) || 0;
-                    // console.log(`Applying ${blueprintName} - ${featureName}: currentMod=${currentMod}, adding=${value}, total=${currentMod + value}`);
-                    this.setModification(module, featureName, currentMod + value, false, true);
-                  }
-                } else {
-                  // console.log('No features found for blueprint grade 5');
-                }
-              } else {
-                // console.log('Blueprint missing or no grade 5 data');
-              }
-            }
+            // This is a pre-engineered module with no saved blueprint - set up and apply.
+            // force: true so the module's own pre-eng modifiers bypass the
+            // per-group user-engineering allow-list (see initializePreEngineeredModule).
+            this._applyPreEngineeredModifiers(module, { setupBlueprint: true, preventUpdate: true, force: true });
           } else {
             module.blueprint = {};
           }
@@ -910,56 +916,25 @@ export default class Ship {
             module.blueprint.special = blueprints[cl + i].special;
             // For pre-engineered modules, clear and re-apply ALL blueprints cumulatively
             if (module.preEngineered && module.preEngineered.blueprints) {
-              this.clearModifications(module, true); // Prevent stat update
-              const blueprintNames = _.split(module.preEngineered.blueprints, ',');
-              for (const blueprintName of blueprintNames) {
-                const blueprint = getBlueprint(blueprintName.trim(), module);
-                if (blueprint) {
-                  // Pre-engineered modules are always grade 5, except for heatsinks, Abrasion Blasters and MC's which are grade 1
-                  if (module.symbol === 'Hpt_HeatSinkLauncher_Turret_Tiny' || module.symbol === 'Hpt_Mining_AbrBlstr_Fixed_Small' || module.symbol === 'Hpt_MultiCannon_Fixed_Medium') {
-                    blueprint.grade = 1; // Heatsinks and Abrasion Blasters and MC's are always Grade 1
-                  } else {
-                    blueprint.grade = 5; // Pre-engineered are always Grade 5
+              this._applyPreEngineeredModifiers(module, { clearFirst: true, preventUpdate: true, force: true });
+            } else {
+              // Regular modules: reapply hidden object-type features (e.g. damagedist)
+              // from the blueprint, as they can't be serialized in the binary URL format
+              const grade = module.blueprint.grade;
+              const bpData = Modifications.blueprints[blueprints[cl + i].fdname];
+              if (bpData && bpData.grades && bpData.grades[grade] && bpData.grades[grade].features) {
+                for (const featureName in bpData.grades[grade].features) {
+                  const mod = Modifications.modifications[featureName];
+                  if (mod && mod.type === 'object') {
+                    this.setModification(module, featureName, bpData.grades[grade].features[featureName], false, true, true);
                   }
-                  setQualityCB(blueprint, 1, (featureName, value) => {
-                    // Add modifications cumulatively for pre-engineered modules
-                    const currentMod = module.getModValue(featureName, true) || 0;
-                    this.setModification(module, featureName, currentMod + value, false, true, true);
-                  });
                 }
               }
             }
             // Regular modules: saved mods are already loaded and correct
           } else if (module.preEngineered && module.preEngineered.blueprints) {
-            // This is a pre-engineered module with no saved blueprint, so create the default blueprint structure
-            module.blueprint = {};
-            module.blueprint.fdname = _.split(module.preEngineered.blueprints, ',')[0].trim();
-            // Pre-engineered modules can be different grades
-            module.blueprint.grade = module.preEngineered.grade;
-            module.blueprint.grades = Modifications.blueprints[module.blueprint.fdname].grades;
-            module.blueprint.name = Modifications.blueprints[module.blueprint.fdname].name;
-
-            // If the pre-engineered module has a default experimental effect, apply it
-            if (module.preEngineered.experimentalEffects && module.preEngineered.experimentalEffects.length > 0) {
-              const specialName = module.preEngineered.experimentalEffects[0];
-              const special = _.find(Modifications.specials, o => o.edname === specialName);
-              if (special) {
-                module.blueprint.special = special;
-              }
-            }
-            // Apply the default blueprints cumulatively
-            const blueprintNames = _.split(module.preEngineered.blueprints, ',');
-            for (const blueprintName of blueprintNames) {
-              const blueprint = getBlueprint(blueprintName.trim(), module);
-              if (blueprint) {
-                blueprint.grade = module.preEngineered.grade;
-                setQualityCB(blueprint, 1, (featureName, value) => {
-                  // Add modifications cumulatively for pre-engineered modules
-                  const currentMod = module.getModValue(featureName, true) || 0;
-                  this.setModification(module, featureName, currentMod + value, false, true, true);
-                });
-              }
-            }
+            // This is a pre-engineered module with no saved blueprint - set up and apply
+            this._applyPreEngineeredModifiers(module, { setupBlueprint: true, preventUpdate: true, force: true });
           } else {
             module.blueprint = {};
           }
@@ -989,71 +964,12 @@ export default class Ship {
             module.blueprint.special = blueprints[cl + i].special;
             // For pre-engineered modules, clear and re-apply ALL blueprints cumulatively
             if (module.preEngineered && module.preEngineered.blueprints) {
-              this.clearModifications(module, true); // Prevent stat update
-              const blueprintNames = _.split(module.preEngineered.blueprints, ',');
-              for (const blueprintName of blueprintNames) {
-                const blueprint = getBlueprint(blueprintName.trim(), module);
-                if (blueprint) {
-                  // Pre-engineered modules are always grade 5, except for heatsinks, Abrasion Blasters and MC's which are grade 1
-                  if (module.symbol === 'Hpt_HeatSinkLauncher_Turret_Tiny' || module.symbol === 'Hpt_Mining_AbrBlstr_Fixed_Small' || module.symbol === 'Hpt_MultiCannon_Fixed_Medium') {
-                    blueprint.grade = 1; // Heatsinks, Abrasion Blasters and MC's are always Grade 1
-                  } else {
-                    blueprint.grade = 5; // Pre-engineered are always Grade 5
-                  }
-                  setQualityCB(blueprint, 1, (featureName, value) => {
-                    // Add modifications cumulatively for pre-engineered modules
-                    const currentMod = module.getModValue(featureName, true) || 0;
-                    this.setModification(module, featureName, currentMod + value, false, true, true);
-                  });
-                }
-              }
+              this._applyPreEngineeredModifiers(module, { clearFirst: true, preventUpdate: true, force: true });
             }
             // Regular modules: saved mods are already loaded and correct
           } else if (module.preEngineered && module.preEngineered.blueprints) {
-            // console.log('Pre-engineered module detected:', module.symbol, module.preEngineered);
-            // This is a pre-engineered module with no saved blueprint, so create the default blueprint structure
-            module.blueprint = {};
-            module.blueprint.fdname = _.split(module.preEngineered.blueprints, ',')[0].trim();
-            // Pre-engineered modules can be different grades
-            module.blueprint.grade = module.preEngineered.grade;
-            module.blueprint.grades = Modifications.blueprints[module.blueprint.fdname].grades;
-            module.blueprint.name = Modifications.blueprints[module.blueprint.fdname].name;
-            // console.log('Created blueprint structure:', module.blueprint);
-
-            // If the pre-engineered module has a default experimental effect, apply it
-            if (module.preEngineered.experimentalEffects && module.preEngineered.experimentalEffects.length > 0) {
-              const specialName = module.preEngineered.experimentalEffects[0];
-              const special = _.find(Modifications.specials, o => o.edname === specialName);
-              if (special) {
-                module.blueprint.special = special;
-              }
-            }
-            // Apply the default blueprints cumulatively
-            const blueprintNames = _.split(module.preEngineered.blueprints, ',');
-            // console.log('Blueprint names to apply:', blueprintNames);
-            for (const blueprintName of blueprintNames) {
-              console.log('Processing blueprint:', blueprintName.trim());
-              const blueprint = getBlueprint(blueprintName.trim(), module);
-              // console.log('Got blueprint object:', blueprint);
-              if (blueprint && blueprint.grades && blueprint.grades[5]) {
-                // console.log('Blueprint has grade 5, features:', blueprint.grades[5].features);
-                // Apply each feature from this blueprint's grade 5 modifications
-                const features = blueprint.grades[5].features;
-                if (features) {
-                  for (const featureName in features) {
-                    const value = features[featureName][0]; // Grade 5 value
-                    // Add modifications cumulatively for pre-engineered modules
-                    const currentMod = module.getModValue(featureName, true) || 0;
-                    // console.log(`Applying ${blueprintName} - ${featureName}: currentMod=${currentMod}, adding=${value}, total=${currentMod + value}`);
-                    this.setModification(module, featureName, currentMod + value, false, true);
-                  }
-                } else {
-                  // console.log('No features found for blueprint grade 5');
-                }
-              } else {
-                // console.log('Blueprint missing or no grade 5 data');
-              }
-            }
+            // This is a pre-engineered module with no saved blueprint - set up and apply
+            this._applyPreEngineeredModifiers(module, { setupBlueprint: true, preventUpdate: true, force: true });
           } else {
             module.blueprint = {};
           }
@@ -1094,28 +1010,56 @@ export default class Ship {
       return this;
     }
 
-    let standard = new Array(this.standard.length),
-        hardpoints = new Array(this.hardpoints.length),
-        internal = new Array(this.internal.length),
-        modifications = new Array(1 + this.standard.length + this.hardpoints.length + this.internal.length),
-        blueprints = new Array(1 + this.standard.length + this.hardpoints.length + this.internal.length),
-        parts = serializedString.split('.'),
+    let parts = serializedString.split('.'),
         priorities = null,
         enabled = null,
         code = parts[0];
 
-    // Code has a version ID embedded as the first character (if it is alphabetic)
+    // The first character identifies the link version:
+    //   '0'-'4' (digit) -> v1 (legacy, pre-military-slots)
+    //   'A'            -> v2 (legacy positional, coriolis-data pre-new-slots order)
+    //   'B'            -> v3 (positional against ship-slots.json authoritative order)
+    // See coriolis/docs/link-format-v3.md.
     let version;
     if (code && code.match(/^[0-4]/)) {
-      // Starting with bulkhead number is version 1
       version = 1;
+    } else if (code && code.charAt(0) === 'B') {
+      version = 3;
+      code = code.substring(1);
     } else {
-      // Version 2 (current version)
+      // 'A' (or any other alpha marker) -> v2
       version = 2;
       if (code) {
         code = code.substring(1);
       }
     }
+
+    // A v1/v2 link for a ship that has since gained/re-sized internal slots is
+    // positional against the ship's OLD internal layout. Decode using that OLD
+    // length, then remap onto the current (new) layout so modules land in their
+    // original slots and new slots stay empty. v3 links are already in current
+    // order, so no migration.
+    const migrateInternal = version !== 3 && needsInternalMigration(this.id);
+    const oldInternalLen = migrateInternal
+      ? OLD_INTERNAL_LAYOUTS[this.id].length
+      : this.internal.length;
+
+    // A v1/v2 link for a ship that has since gained a HARDPOINT slot (e.g. the
+    // Asp Scout's 3rd utility mount) encodes only the OLD number of hardpoints.
+    // Decode using that OLD length so the positional stream (and the global
+    // mod/blueprint/priority/enabled indices, which run
+    // [bulkhead, ...standard, ...hardpoints, ...internal]) stay aligned, then
+    // remap onto the current hardpoint array. v3 links are already current.
+    const migrateHardpoint = version !== 3 && needsHardpointMigration(this.id);
+    const oldHardpointLen = migrateHardpoint
+      ? OLD_HARDPOINT_LAYOUTS[this.id].length
+      : this.hardpoints.length;
+
+    let standard = new Array(this.standard.length),
+        hardpoints = new Array(oldHardpointLen),
+        internal = new Array(oldInternalLen),
+        modifications = new Array(1 + this.standard.length + oldHardpointLen + oldInternalLen),
+        blueprints = new Array(1 + this.standard.length + oldHardpointLen + oldInternalLen);
 
     if (parts[1]) {
       enabled = LZString.decompressFromBase64(Utils.fromUrlSafe(parts[1])).split('');
@@ -1140,9 +1084,56 @@ export default class Ship {
 
     decodeToArray(code, internal, decodeToArray(code, hardpoints, decodeToArray(code, standard, 1)));
 
-    if (version != 2) {
+    if (version == 1) {
       // Alter as required due to changes in the (build) code from one version to the next
-      this.upgradeInternals(internal, 1 + this.standard.length + this.hardpoints.length, priorities, enabled, modifications, blueprints, version);
+      this.upgradeInternals(internal, 1 + this.standard.length + oldHardpointLen, priorities, enabled, modifications, blueprints, version);
+    }
+
+    // The global parallel arrays (priorities/enabled/modifications/blueprints)
+    // run [bulkhead, ...standard, ...hardpoints, ...internal]. Migrate the
+    // hardpoint region FIRST (it sits before internal, so remapping it changes
+    // the internal region's offset), then the internal region.
+    if (migrateHardpoint) {
+      const preHardpoint = 1 + this.standard.length;
+
+      hardpoints = remapHardpointArray(this.id, hardpoints);
+
+      const remapHpRegion = (arr, fill) => {
+        if (!arr) return arr;
+        const head = arr.slice(0, preHardpoint);
+        const oldHp = arr.slice(preHardpoint, preHardpoint + oldHardpointLen);
+        const tail = arr.slice(preHardpoint + oldHardpointLen); // the internal region
+        const newHp = remapHardpointParallel(this.id, oldHp, fill);
+        return head.concat(newHp, tail);
+      };
+      priorities = remapHpRegion(priorities, '0');
+      enabled = remapHpRegion(enabled, '1');
+      modifications = remapHpRegion(modifications, undefined);
+      blueprints = remapHpRegion(blueprints, undefined);
+    }
+
+    if (migrateInternal) {
+      // Remap the decoded OLD-order internal slots (and their parallel arrays)
+      // onto the current layout. modifications/blueprints are global-indexed:
+      // [bulkhead, ...standard, ...hardpoints, ...internal], so the internal
+      // portion is remapped in place at the internal offset. priorities/enabled
+      // share that same global layout. Use the CURRENT hardpoints length here —
+      // if hardpoints were just migrated above, the arrays are already widened.
+      const preInternal = 1 + this.standard.length + this.hardpoints.length;
+
+      internal = remapInternalArray(this.id, internal);
+
+      const remapTail = (arr, fill) => {
+        if (!arr) return arr;
+        const head = arr.slice(0, preInternal);
+        const oldTail = arr.slice(preInternal, preInternal + oldInternalLen);
+        const newTail = remapInternalParallel(this.id, oldTail, fill);
+        return head.concat(newTail);
+      };
+      priorities = remapTail(priorities, '0');
+      enabled = remapTail(enabled, '1');
+      modifications = remapTail(modifications, undefined);
+      blueprints = remapTail(blueprints, undefined);
     }
 
     return this.buildWith(
@@ -1226,6 +1217,10 @@ export default class Ship {
   setCostIncluded(item, included) {
     if (item.incCost != included && item.m) {
       this.totalCost += included ? item.discountedCost : -item.discountedCost;
+      if (item.m.getTotalMercCoin) {
+        const mc = item.m.getTotalMercCoin(this.mercCoinRolls);
+        this.totalMercCoin = (this.totalMercCoin || 0) + (included ? mc : -mc);
+      }
     }
     item.incCost = included;
     return this;
@@ -1572,10 +1567,10 @@ export default class Ship {
       .reduce((sum, fuel) => sum + fuel)
       .value();
 
-    // handle cargo capacity (floor each module's cargo to match in-game integer values)
+    // handle cargo capacity (round each module's cargo to match in-game integer values)
     cargoCapacity += chain(slots)
       .map(slot => slot.m ? slot.m.get('cargo') : null)
-      .map(cargo => cargo ? Math.floor(cargo) : 0)
+      .map(cargo => cargo ? Math.round(cargo) : 0)
       .reduce((sum, cargo) => sum + cargo)
       .value();
 
@@ -1606,25 +1601,9 @@ export default class Ship {
     const reserveFuelMass = this.reserveFuelCapacity || 0;
     const movementMass = this.dryMass + this.fuelCapacity + reserveFuelMass;
 
-    // DEBUG for Imperial Courier
-    if (this.id === 'imperial_courier' && this.standard && this.standard[1] && this.standard[1].m) {
-      console.log('updateMovement():');
-      console.log('  dryMass:', this.dryMass);
-      console.log('  fuelCapacity:', this.fuelCapacity);
-      console.log('  reserveFuelCapacity:', this.reserveFuelCapacity || 0);
-      console.log('  movementMass:', movementMass);
-      console.log('  thrusters:', this.standard[1].m.name, this.standard[1].m.class + this.standard[1].m.rating);
-    }
-
     this.speeds = Calc.speed(movementMass, this.speed, this.standard[1].m, this.minthrust);
     this.topSpeed = this.speeds[4];
     this.topBoost = this.canBoost(0, this.fuelCapacity) ? this.speeds[4] * this.boost / this.speed : 0;
-
-    // DEBUG for Imperial Courier
-    if (this.id === 'imperial_courier') {
-      console.log('  topSpeed:', this.topSpeed.toFixed(1), 'm/s');
-      console.log('  topBoost:', this.topBoost.toFixed(1), 'm/s');
-    }
 
     this.pitches = Calc.pitch(movementMass, this.pitch, this.standard[1].m, this.pipSpeed);
     this.topPitch = this.pitches[4];
@@ -1806,6 +1785,7 @@ export default class Ship {
       for (let modKey in this.bulkheads.m.mods) {
         // Filter out invalid modifications
         if (Modifications.modules['bh'] && Modifications.modules['bh'].modifications.indexOf(modKey) != -1) {
+          if (Modifications.modifications[modKey].type === 'object') continue; // Skip object-type mods (e.g. damagedist) - restored from blueprint on load
           bulkheadMods.push({ id: Modifications.modifications[modKey].id, value: this.bulkheads.m.getModValue(modKey, true) });
         }
       }
@@ -1821,6 +1801,7 @@ export default class Ship {
         for (let modKey in slot.m.mods) {
           // Filter out invalid modifications
           if (Modifications.modules[slot.m.grp] && Modifications.modules[slot.m.grp].modifications.indexOf(modKey) != -1) {
+            if (Modifications.modifications[modKey].type === 'object') continue;
             slotMods.push({ id: Modifications.modifications[modKey].id, value: slot.m.getModValue(modKey, true) });
           }
         }
@@ -1836,6 +1817,7 @@ export default class Ship {
         for (let modKey in slot.m.mods) {
           // Filter out invalid modifications
           if (Modifications.modules[slot.m.grp] && Modifications.modules[slot.m.grp].modifications.indexOf(modKey) != -1) {
+            if (Modifications.modifications[modKey].type === 'object') continue;
             slotMods.push({ id: Modifications.modifications[modKey].id, value: slot.m.getModValue(modKey, true) });
           }
         }
@@ -1851,6 +1833,7 @@ export default class Ship {
         for (let modKey in slot.m.mods) {
           // Filter out invalid modifications
           if (Modifications.modules[slot.m.grp] && Modifications.modules[slot.m.grp].modifications.indexOf(modKey) != -1) {
+            if (Modifications.modifications[modKey].type === 'object') continue;
             slotMods.push({ id: Modifications.modifications[modKey].id, value: slot.m.getModValue(modKey, true) });
           }
         }
@@ -2014,7 +1997,15 @@ export default class Ship {
       slot.m = m;
 
       // If the module is pre-engineered and has no experimental applied, we need to apply the blueprints specified in the module
-      if (m && m.preEngineered && m.preEngineered.blueprints && (!m.blueprint || (!m.blueprint.fdname && !m.blueprint.special))) {
+      if (m && m.preEngineered && m.preEngineered.modifiers && (!m.blueprint || (!m.blueprint.fdname && !m.blueprint.special))) {
+        // This pre-engineered module carries an explicit bespoke modifiers map
+        // (e.g. Guardian weapons). These exact values live only in the modifiers
+        // map, not in the generic blueprint grade tables, so route through the
+        // unified helper which prefers that map (PATH A) and forces the mods
+        // through even for groups that can't be user-engineered. This is the same
+        // path buildWith uses on reload, so fresh-select now matches reload.
+        this._applyPreEngineeredModifiers(m, { setupBlueprint: true, force: true });
+      } else if (m && m.preEngineered && m.preEngineered.blueprints && (!m.blueprint || (!m.blueprint.fdname && !m.blueprint.special))) {
         // This is a pre-engineered module, so we need to apply ALL blueprints cumulatively
         const blueprintNames = _.split(m.preEngineered.blueprints, ',');
 
@@ -2023,11 +2014,7 @@ export default class Ship {
         const firstBlueprint = getBlueprint(firstBlueprintName, m);
         if (firstBlueprint) {
           m.blueprint = firstBlueprint;
-          if (m.symbol === "Hpt_HeatSinkLauncher_Turret_Tiny" || m.symbol === "Hpt_Mining_AbrBlstr_Fixed_Small" || m.symbol === "Hpt_Mining_AbrBlstr_Turret_Small" || m.symbol === "Hpt_MultiCannon_Fixed_Medium") {
-            m.blueprint.grade = 1; // Heatsinks, Abrasion Blasters and MC's are always Grade 1
-          } else {
-            m.blueprint.grade = 5; // Pre-engineered are always Grade 5
-          }
+          m.blueprint.grade = m.preEngineered.grade || 5;
         }
 
         // If the pre-engineered module has a default experimental effect, apply it
@@ -2043,12 +2030,7 @@ export default class Ship {
         for (const blueprintName of blueprintNames) {
           const blueprint = getBlueprint(blueprintName.trim(), m);
           if (blueprint) {
-            // Pre-engineered modules are always grade 5, except for heatsinks, Abrasion Blasters and MC's which are grade 1
-            if (m.symbol === 'Hpt_HeatSinkLauncher_Turret_Tiny' || m.symbol === 'Hpt_Mining_AbrBlstr_Fixed_Small' || m.symbol === 'Hpt_MultiCannon_Fixed_Medium') {
-              blueprint.grade = 1; // Heatsinks, Abrasion Blasters and MC's are always Grade 1
-            } else {
-              blueprint.grade = 5; // Pre-engineered are always Grade 5
-            }
+            blueprint.grade = m.preEngineered.grade || 5;
             setQualityCB(blueprint, 1, (featureName, value) => {
               // For pre-engineered modules, add modifications cumulatively instead of replacing
               const currentMod = m.getModValue(featureName, true) || 0;

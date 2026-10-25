@@ -69,7 +69,12 @@ export default class OutfittingSubpages extends TranslatedComponent {
     Persist.setOutfittingTab('power');
 
     const powerMarker = `${ship.toString()}`;
-    const costMarker = `${ship.toString().split('.')[0]}`;
+    // Cost depends on the module layout (first segment) and on engineering
+    // modifications (last segment) — Merc Coin costs change with engineering
+    // grade — but not on power enable/priority (the two middle segments), so
+    // build the marker from the layout and modifications segments only.
+    const shipCode = ship.toString().split('.');
+    const costMarker = `${shipCode[0]}.${shipCode[shipCode.length - 1]}`;
 
     return <div>
       <PowerManagement ship={ship} code={powerMarker} onChange={onChange} />
@@ -171,10 +176,10 @@ export default class OutfittingSubpages extends TranslatedComponent {
         <table className='tabs'>
           <thead>
             <tr>
-              <th style={{ width:'25%' }} className={cn({ active: tab == 'power' })} onClick={this._showTab.bind(this, 'power')} ><span className='tab-label-full'>{translate('power and costs')}</span><span className='tab-label-abbr'>{translate('pwr & costs')}</span></th>
-              <th style={{ width:'25%' }} className={cn({ active: tab == 'profiles' })} onClick={this._showTab.bind(this, 'profiles')} >{translate('profiles')}</th>
-              <th style={{ width:'25%' }} className={cn({ active: tab == 'offence' })} onClick={this._showTab.bind(this, 'offence')} >{translate('offence')}</th>
-              <th style={{ width:'25%' }} className={cn({ active: tab == 'defence' })} onClick={this._showTab.bind(this, 'defence')} >{translate('tab_defence')}</th>
+              <th style={{ width:'25%' }} className={cn({ active: tab == 'power' })} onClick={() => this._showTab('power')} ><span className='tab-label-full'>{translate('power and costs')}</span><span className='tab-label-abbr'>{translate('pwr & costs')}</span></th>
+              <th style={{ width:'25%' }} className={cn({ active: tab == 'profiles' })} onClick={() => this._showTab('profiles')} >{translate('profiles')}</th>
+              <th style={{ width:'25%' }} className={cn({ active: tab == 'offence' })} onClick={() => this._showTab('offence')} >{translate('offence')}</th>
+              <th style={{ width:'25%' }} className={cn({ active: tab == 'defence' })} onClick={() => this._showTab('defence')} >{translate('tab_defence')}</th>
             </tr>
           </thead>
         </table>

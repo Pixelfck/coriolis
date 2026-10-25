@@ -324,7 +324,10 @@ const INTGRPCAT = {
   'ft': 'fuel',
   'fs': 'fuel',
   'fh': 'hangars',
+  'fhmkii': 'hangars',
   'pv': 'hangars',
+  'lpv': 'hangars',
+  'lpvmkii': 'hangars',
   'cc': 'limpet controllers',
   'fx': 'limpet controllers',
   'hb': 'limpet controllers',
@@ -493,7 +496,7 @@ export function isShieldGenerator(g) {
  * @return {ModuleSet}     The set of modules the ship can install
  */
 export function forShip(shipId) {
-  return new ModuleSet(Modules, Ships[shipId]);
+  return new ModuleSet(Modules, Ships[shipId], shipId);
 }
 
 /**
