@@ -60,7 +60,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
     const hasWeapons = ship.hasHadrdpointMounted();
 
     // Heat stats
-    const ppEfficiency = ship.standard[0].m.getThermalEfficiency(); // Power Plant efficiency rate
+    const ppEfficiency = ship.getPowerPlantThermalEfficiency();
     const scbStats = ship.getShieldBankCellStats();
     const thermalLoad = {
       all: {

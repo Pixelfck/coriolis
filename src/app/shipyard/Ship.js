@@ -2359,6 +2359,27 @@ export default class Ship {
   }
 
   /**
+   * Get the Thermal Efficiency for the power plant, taking a bug in ED with the 'Armoured' blueprint into account
+   * @param {Boolean} [modified=true] Whether to take modifications into account
+   * @return {Number} the thermal efficiency of this power plant
+   */
+  getPowerPlantThermalEfficiency(modified = true) {
+    const ppEfficiencyBase= this.standard[0].m.getThermalEfficiency(false);
+    if (!modified) {
+      return ppEfficiencyBase;
+    }
+
+    const ppEfficiencyModified = this.standard[0].m.getThermalEfficiency(true);
+    const blueprint = this.standard[0].m.blueprint;
+
+    if (blueprint && blueprint.fdname === 'PowerPlant_Armoured') { // Is the Armoured blueprint applied to this Power Plant module?
+      return Math.max(ppEfficiencyModified, ppEfficiencyBase);
+    }
+
+    return ppEfficiencyModified;
+  }
+
+  /**
    * Get the thermal load for the ship's hardpoints, both for a (near) empty weapon capacitor and a full one
    * @param {int} wep the currently allocated weapon capacitor pips
    * @returns {{weaponCapacitorFull: number, weaponCapacitorEmpty: number}}

@@ -65,15 +65,9 @@ export default class ShipSummaryTable extends TranslatedComponent {
       shieldColour
     };
     // calculate heat level
-    const ppEfficiency = ship.standard[0].m.getThermalEfficiency(); // Power Plant efficiency rate
+    const ppEfficiency = ship.getPowerPlantThermalEfficiency();
     const thermalLoad_retracted = ship.powerRetracted * ppEfficiency; // Total thermal output for all modules, weapons retracted
     const heat_idle = ship.getHeatLevel(thermalLoad_retracted, 0);
-
-
-    console.log('ppEfficiency', ppEfficiency);
-    console.log('thermalLoad (retracted)', thermalLoad_retracted);
-    console.log('heat (idle)', heat_idle);
-
 
     return <div id='summary'>
       <div style={{display: "table", width: "100%"}}>
