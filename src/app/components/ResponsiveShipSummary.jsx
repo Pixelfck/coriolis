@@ -657,7 +657,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                     ? heat_allWeaponsFiring_capacitorFull.result
                     : heat_allWeaponsFiring_capacitorFull.type === 'percentage'
                       ? formats.pct(heat_allWeaponsFiring_capacitorFull.result)
-                      : formats.time(heat_allWeaponsFiring_capacitorFull.result)}{heat_allWeaponsFiring_capacitorFull.type === 'time' ? u.s : null}{hasWeapons?'*':null}</span></td>
+                      : formats.time(heat_allWeaponsFiring_capacitorFull.result)}{heat_allWeaponsFiring_capacitorFull.type === 'time' ? u.s : null}{hasWeapons && heat_allWeaponsFiring_capacitorFull.type !== 'string'?'*':null}</span></td>
               </tr>
               <tr>
                 <td
@@ -677,7 +677,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                     ? heat_allWeaponsFiring_capacitorNearEmpty.result
                     : heat_allWeaponsFiring_capacitorNearEmpty.type === 'percentage'
                       ? formats.pct(heat_allWeaponsFiring_capacitorNearEmpty.result)
-                      : formats.time(heat_allWeaponsFiring_capacitorNearEmpty.result)}{heat_allWeaponsFiring_capacitorNearEmpty.type === 'time' ? u.s : null}{hasWeapons?'*':null}</span></td>
+                      : formats.time(heat_allWeaponsFiring_capacitorNearEmpty.result)}{heat_allWeaponsFiring_capacitorNearEmpty.type === 'time' ? u.s : null}{hasWeapons && heat_allWeaponsFiring_capacitorFull.type !== 'string'?'*':null}</span></td>
               </tr>
               <tr>
                 <td
