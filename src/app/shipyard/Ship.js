@@ -2470,9 +2470,8 @@ export default class Ship {
     if (thermalLoad === 0) {
       return {
         type: 'string',
-        result: '-',
+        result: 'N/A',
         className: 'primary',
-        tooltip: 'PHRASE_HEAT_MODULE_UNAVAILBLE',
       }
     }
 
