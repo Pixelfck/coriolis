@@ -2428,12 +2428,12 @@ export default class Ship {
    * @returns {object} thermal load information
    */
   getHeatLevel(thermalLoad, thermalLoadBase, duration) {
-    if (thermalLoad === 0) {
+    if (!this.heatDissipation) {
       return {
         type: 'string',
         result: '-',
         className: 'primary',
-        tooltip: 'PHRASE_HEAT_MODULE_UNAVAILBLE',
+        tooltip: 'PHRASE_HEAT_UNAVAILBLE_FOR_SHIP',
       }
     }
 
@@ -2443,6 +2443,15 @@ export default class Ship {
         result: '∞',
         className: 'warning',
         tooltip: 'PHRASE_HEAT_BASE_OVERLOAD',
+      }
+    }
+
+    if (thermalLoad === 0) {
+      return {
+        type: 'string',
+        result: '-',
+        className: 'primary',
+        tooltip: 'PHRASE_HEAT_MODULE_UNAVAILBLE',
       }
     }
 
