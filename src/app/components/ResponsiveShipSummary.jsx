@@ -592,7 +592,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
 
           {/* Heat Stats */}
           <div className='stat-table'>
-            <div className='stat-table-header'>{translate('HEAT')}</div>
+            <div className='stat-table-header'>{translate('HEAT')} <sup>({translate('beta')})</sup></div>
             <table>
               <colgroup>
                 <col className='stat-label-col' />
