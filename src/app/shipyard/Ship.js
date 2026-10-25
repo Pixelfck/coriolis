@@ -2281,7 +2281,7 @@ export default class Ship {
 
   hasHadrdpointMounted() {
     for (let slot of this.hardpoints) {
-      if (slot.maxClass > 0 && slot.m) { // exclude Utility Slots
+      if (slot.maxClass > 0 && slot.m) { // is this a non-utility hardpoint, with a module fitted?
         return true;
       }
     }
@@ -2340,7 +2340,7 @@ export default class Ship {
   getSustainedHardpointEnergyDrawPerSecond(){
     let sustainedEnergyPerSecond = 0;
     for (let slot of this.hardpoints) {
-      if (slot.m) {
+      if (slot.m) { // slot has a module fitted?
         sustainedEnergyPerSecond += (slot.m.getClip() ? (slot.m.getClip() * slot.m.getEps() / slot.m.getRoF()) / ((slot.m.getClip() / slot.m.getRoF()) + slot.m.getReload()) : slot.m.getEps());
       }
     }
@@ -2394,7 +2394,7 @@ export default class Ship {
 
     let thermalLoad, sustainedSecondsPerCycle;
     for (let slot of this.hardpoints) {
-      if (slot.m) {
+      if (slot.maxClass > 0 && slot.m) { // is this a non-utility hardpoint, with a module fitted?
         sustainedSecondsPerCycle = slot.m.getSustainedSecondsPerCycle() || 1;
         thermalLoad = slot.m.get('thermload') * (slot.m.getSustainedFiringsPerCycle() / sustainedSecondsPerCycle);
         effectiveThermalLoad.weaponCapacitorFull += this.getEffectiveWeaponThermalLoad(thermalLoad, slot.m.get('distdraw'), pdWeaponCapacitor, 1);
