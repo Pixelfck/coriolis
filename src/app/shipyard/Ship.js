@@ -2380,11 +2380,11 @@ export default class Ship {
   }
 
   /**
-   * Get the thermal load for the ship's hardpoints, both for a (near) empty weapon capacitor and a full one
+   * Get the thermal load for the ship's hardpoints, both for a near-empty weapon capacitor and a full one
    * @param {int} wep the currently allocated weapon capacitor pips
    * @returns {{weaponCapacitorFull: number, weaponCapacitorEmpty: number}}
    */
-  getHardpointsThermalLoad(wep) {
+  getWeaponsThermalLoad(wep) {
     const weaponSustainedFireRate = this.getSustainedWeaponsFireRate(wep);
     const pdWeaponCapacitor = this.standard[4].m.wepcap; // Power Distributor weapon capacitor (MJ)
     const effectiveThermalLoad = {
@@ -2392,11 +2392,10 @@ export default class Ship {
       weaponCapacitorEmpty: 0,
     };
 
-    let thermalLoad, sustainedSecondsPerCycle;
     for (let slot of this.hardpoints) {
       if (slot.maxClass > 0 && slot.m) { // is this a non-utility hardpoint, with a module fitted?
-        sustainedSecondsPerCycle = slot.m.getSustainedSecondsPerCycle() || 1;
-        thermalLoad = slot.m.get('thermload') * (slot.m.getSustainedFiringsPerCycle() / sustainedSecondsPerCycle);
+        const sustainedSecondsPerCycle = slot.m.getSustainedSecondsPerCycle() || 1;
+        const thermalLoad = slot.m.get('thermload') * (slot.m.getSustainedFiringsPerCycle() / sustainedSecondsPerCycle);
         effectiveThermalLoad.weaponCapacitorFull += this.getEffectiveWeaponThermalLoad(thermalLoad, slot.m.get('distdraw'), pdWeaponCapacitor, 1);
         effectiveThermalLoad.weaponCapacitorEmpty += this.getEffectiveWeaponThermalLoad(thermalLoad, slot.m.get('distdraw'), pdWeaponCapacitor, 0);
       }
@@ -2406,6 +2405,16 @@ export default class Ship {
 
     return effectiveThermalLoad;
   };
+
+  getScbsThermalLoad() {
+    const scbStats = this.getShieldBankCellStats();
+    return scbStats.thermalLoad;
+  }
+
+  getScbsMaxSpinupTime() {
+    const scbStats = this.getShieldBankCellStats();
+    return scbStats.maxSpinupTime;
+  }
 
   /**
    * Upgrade information about internals with version changes

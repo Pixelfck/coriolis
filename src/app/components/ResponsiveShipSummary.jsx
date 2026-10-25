@@ -61,23 +61,22 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
 
     // Heat stats
     const ppEfficiency = ship.getPowerPlantThermalEfficiency();
-    const scbStats = ship.getShieldBankCellStats();
     const thermalLoad = {
-      all: {
-        retracted: ship.powerRetracted * ppEfficiency, // Total thermal output for all modules, weapons retracted
-        deployed: ship.powerDeployed * ppEfficiency, // Total thermal output for all modules, weapons deployed
+      modulesTotal: {
+        retracted: ship.powerRetracted * ppEfficiency, // Total thermal output for all modules, hardpoints retracted
+        deployed: ship.powerDeployed * ppEfficiency,   // Total thermal output for all modules, hardpoints deployed
       },
-      thrusters: ship.standard[1].m.get('thermload'), // Thermal output for Thrusters
-      fsd: ship.standard[2].m.get('thermload'), // Thermal output for Frame Shift Drive
-      hardpoints: ship.getHardpointsThermalLoad(pips.wep),
-      scb: scbStats.thermalLoad,
+      thrusters: ship.standard[1].m.get('thermload'),  // Thermal output for Thrusters under max thrust
+      fsd: ship.standard[2].m.get('thermload'),        // Thermal output for Frame Shift Drive while charging up
+      weaponsFiring: ship.getWeaponsThermalLoad(pips.wep), // Thermal output for Weapons while firing
+      scb: ship.getScbsThermalLoad(),                  // Thermal output for SCBs while spinning up
     };
-    const heat_idle = ship.getHeatLevel(thermalLoad.all.retracted, 0);
-    const heat_maxThrust = ship.getHeatLevel(thermalLoad.thrusters, thermalLoad.all.retracted);
-    const heat_maxThrustFsdCharging = ship.getHeatLevel(thermalLoad.fsd, thermalLoad.all.retracted + thermalLoad.thrusters);
-    const heat_allWeaponsFiring_capacitorFull = ship.getHeatLevel(thermalLoad.hardpoints.weaponCapacitorFull, thermalLoad.all.deployed + thermalLoad.thrusters);
-    const heat_allWeaponsFiring_capacitorNearEmpty = ship.getHeatLevel(thermalLoad.hardpoints.weaponCapacitorEmpty, thermalLoad.all.deployed + thermalLoad.thrusters);
-    const heat_maxThrustSbcFiring = ship.getHeatLevel(thermalLoad.scb, thermalLoad.all.deployed + thermalLoad.thrusters, scbStats.maxSpinupTime);
+    const heat_idle = ship.getHeatLevel(thermalLoad.modulesTotal.retracted, 0);
+    const heat_maxThrust = ship.getHeatLevel(thermalLoad.thrusters, thermalLoad.modulesTotal.retracted);
+    const heat_maxThrustFsdCharging = ship.getHeatLevel(thermalLoad.fsd, thermalLoad.modulesTotal.retracted + thermalLoad.thrusters);
+    const heat_allWeaponsFiring_capacitorFull = ship.getHeatLevel(thermalLoad.weaponsFiring.weaponCapacitorFull, thermalLoad.modulesTotal.deployed + thermalLoad.thrusters);
+    const heat_allWeaponsFiring_capacitorNearEmpty = ship.getHeatLevel(thermalLoad.weaponsFiring.weaponCapacitorEmpty, thermalLoad.modulesTotal.deployed + thermalLoad.thrusters);
+    const heat_maxThrustSbcFiring = ship.getHeatLevel(thermalLoad.scb, thermalLoad.modulesTotal.deployed + thermalLoad.thrusters, ship.getScbsMaxSpinupTime());
 
     /**
      * Format large credit values compactly (e.g. 1.05Bn, 52.4M)
