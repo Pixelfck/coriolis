@@ -2437,7 +2437,7 @@ export default class Ship {
       }
     }
 
-    if (thermalLoadBase > this.heatDissipationMax) {
+    if (thermalLoadBase > this.heatDissipation) {
       return {
         type: 'string',
         result: '∞',
@@ -2447,17 +2447,17 @@ export default class Ship {
     }
 
     thermalLoad += thermalLoadBase;
-    if (thermalLoad <= this.heatDissipationMax) {
+    if (thermalLoad <= this.heatDissipation) {
       return {
         type: 'percentage',
-        result: this.getEquilibriumHeatLevel(this.heatDissipationMax, thermalLoad) / 1.5,
+        result: this.getEquilibriumHeatLevel(this.heatDissipation, thermalLoad) / 1.5,
         tooltip: 'PHRASE_HEAT_BASE_STABLE',
       }
     }
 
-    const heatLevelBase = this.getEquilibriumHeatLevel(this.heatDissipationMax, thermalLoadBase);
-    const time10 = this.getTimeUntilHeatLevel(this.heatCapacity, this.heatDissipationMax, thermalLoad, heatLevelBase, 1.0);
-    const time15 = (this.heatCapacity / 2) / (thermalLoad - this.heatDissipationMax); // displayed heatLevel 66% -> 100% is actual heatlevel 1.0 -> 1.5
+    const heatLevelBase = this.getEquilibriumHeatLevel(this.heatDissipation, thermalLoadBase);
+    const time10 = this.getTimeUntilHeatLevel(this.heatCapacity, this.heatDissipation, thermalLoad, heatLevelBase, 1.0);
+    const time15 = (this.heatCapacity / 2) / (thermalLoad - this.heatDissipation); // displayed heatLevel 66% -> 100% is actual heatlevel 1.0 -> 1.5
 
     if (!duration) {
       return {
@@ -2471,7 +2471,7 @@ export default class Ship {
     if (time10 > duration) {
       return {
         type: 'percentage',
-        result: this.getThermalLoadAtTime(this.heatCapacity, this.heatDissipationMax, thermalLoad, heatLevelBase, duration) / 1.5,
+        result: this.getThermalLoadAtTime(this.heatCapacity, this.heatDissipation, thermalLoad, heatLevelBase, duration) / 1.5,
         tooltip: 'PHRASE_HEAT_STABLE',
       }
     }
@@ -2485,8 +2485,8 @@ export default class Ship {
     }
 
     duration -= time10 + time15;
-    const heatLevelPeak = 1.5 + (duration * (thermalLoad - this.heatDissipationMax) / this.heatCapacity);
-    const timeCool = (heatLevelPeak - 1.5) / ((this.heatDissipationMax - thermalLoadBase) / this.heatCapacity);
+    const heatLevelPeak = 1.5 + (duration * (thermalLoad - this.heatDissipation) / this.heatCapacity);
+    const timeCool = (heatLevelPeak - 1.5) / ((this.heatDissipation - thermalLoadBase) / this.heatCapacity);
 
     // TODO: find a method to make this tooltip strings translatable?
     return {
