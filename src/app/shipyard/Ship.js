@@ -2281,7 +2281,7 @@ export default class Ship {
 
   hasHadrdpointMounted() {
     for (let slot of this.hardpoints) {
-      if (slot.m) {
+      if (slot.maxClass > 0 && slot.m) { // exclude Utility Slots
         return true;
       }
     }
