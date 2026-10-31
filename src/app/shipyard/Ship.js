@@ -1491,11 +1491,11 @@ export default class Ship {
    */
   updatePowerUsed() {
     let bands = [
-      { deployed: 0, retracted: 0, },
-      { deployed: 0, retracted: 0, },
-      { deployed: 0, retracted: 0, },
-      { deployed: 0, retracted: 0, },
-      { deployed: 0, retracted: 0, }
+      { deployed: 0, retracted: 0, retractedSum: 0, deployedSum: 0, },
+      { deployed: 0, retracted: 0, retractedSum: 0, deployedSum: 0, },
+      { deployed: 0, retracted: 0, retractedSum: 0, deployedSum: 0, },
+      { deployed: 0, retracted: 0, retractedSum: 0, deployedSum: 0, },
+      { deployed: 0, retracted: 0, retractedSum: 0, deployedSum: 0, }
     ];
 
     if (this.cargoHatch.enabled) {
