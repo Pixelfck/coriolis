@@ -69,14 +69,14 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
       thrusters: ship.standard[1].m.get('thermload'),  // Thermal output for Thrusters under max thrust
       fsd: ship.standard[2].m.get('thermload'),        // Thermal output for Frame Shift Drive while charging up
       weaponsFiring: ship.getWeaponsThermalLoad(pips.wep), // Thermal output for Weapons while firing
-      scb: ship.getScbsThermalLoad(),                  // Thermal output for SCBs while spinning up
+      scbsSpinningUp: ship.getScbsThermalLoad(),                  // Thermal output for SCBs while spinning up
     };
     const heat_idle = ship.getHeatLevel(thermalLoad.modulesTotal.retracted, 0);
     const heat_maxThrust = ship.getHeatLevel(thermalLoad.thrusters, thermalLoad.modulesTotal.retracted);
     const heat_maxThrustFsdCharging = ship.getHeatLevel(thermalLoad.fsd, thermalLoad.modulesTotal.retracted + thermalLoad.thrusters);
     const heat_allWeaponsFiring_capacitorFull = ship.getHeatLevel(thermalLoad.weaponsFiring.weaponCapacitorFull, thermalLoad.modulesTotal.deployed + thermalLoad.thrusters);
     const heat_allWeaponsFiring_capacitorNearEmpty = ship.getHeatLevel(thermalLoad.weaponsFiring.weaponCapacitorEmpty, thermalLoad.modulesTotal.deployed + thermalLoad.thrusters);
-    const heat_maxThrustSbcFiring = ship.getHeatLevel(thermalLoad.scb, thermalLoad.modulesTotal.deployed + thermalLoad.thrusters, ship.getScbsMaxSpinupTime());
+    const heat_maxThrustSbcFiring = ship.getHeatLevel(thermalLoad.scbsSpinningUp, thermalLoad.modulesTotal.deployed + thermalLoad.thrusters, ship.getScbsMaxSpinupTime());
 
     /**
      * Format large credit values compactly (e.g. 1.05Bn, 52.4M)
