@@ -1533,14 +1533,14 @@ export default class Ship {
       prevDeployed = band.deployedSum = prevDeployed + band.retracted + band.deployed;
 
       const nextRetractedDraw = prevRetractedDraw + band.retracted;
-      if (!retractedDrawExceeded && nextRetractedDraw <= this.powerAvailable) {
+      if (!retractedDrawExceeded && nextRetractedDraw < this.powerAvailable) { // EDSY used <= but < better matches Coriolis' choices in other parts of the code
         prevRetractedDraw = nextRetractedDraw;
       } else {
         retractedDrawExceeded = true;
       }
 
       const nextDeployedDraw = prevDeployedDraw + band.retracted + band.deployed;
-      if (!deployedDrawExceeded && nextDeployedDraw <= this.powerAvailable) {
+      if (!deployedDrawExceeded && nextDeployedDraw < this.powerAvailable) { // EDSY used <= but <  better matches Coriolis' choices in other parts of the code
         prevDeployedDraw = nextDeployedDraw;
       } else {
         deployedDrawExceeded = true;
