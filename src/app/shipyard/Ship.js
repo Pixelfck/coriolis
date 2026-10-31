@@ -1525,15 +1525,33 @@ export default class Ship {
 
     // Work out the running totals
     let prevRetracted = 0, prevDeployed = 0;
+    let prevRetractedDraw = 0, prevDeployedDraw = 0;
+    let retractedDrawExceeded = false, deployedDrawExceeded = false;
     for (let i = 0, l = bands.length; i < l; i++) {
       const band = bands[i];
       prevRetracted = band.retractedSum = prevRetracted + band.retracted;
-      prevDeployed = band.deployedSum = prevDeployed + band.deployed + band.retracted;
+      prevDeployed = band.deployedSum = prevDeployed + band.retracted + band.deployed;
+
+      const nextRetractedDraw = prevRetractedDraw + band.retracted;
+      if (!retractedDrawExceeded && nextRetractedDraw <= this.powerAvailable) {
+        prevRetractedDraw = nextRetractedDraw;
+      } else {
+        retractedDrawExceeded = true;
+      }
+
+      const nextDeployedDraw = prevDeployedDraw + band.retracted + band.deployed;
+      if (!deployedDrawExceeded && nextDeployedDraw <= this.powerAvailable) {
+        prevDeployedDraw = nextDeployedDraw;
+      } else {
+        deployedDrawExceeded = true;
+      }
     }
 
     // Update global stats
     this.powerRetracted = prevRetracted;
     this.powerDeployed = prevDeployed;
+    this.powerRetractedDraw = prevRetractedDraw;
+    this.powerDeployedDraw = prevDeployedDraw;
     this.priorityBands = bands;
 
     return this;

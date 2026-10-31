@@ -63,8 +63,8 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
     const ppEfficiency = ship.getPowerPlantThermalEfficiency();
     const thermalLoad = {
       modulesTotal: {
-        retracted: ship.powerRetracted * ppEfficiency, // Total thermal output for all modules, hardpoints retracted
-        deployed: ship.powerDeployed * ppEfficiency,   // Total thermal output for all modules, hardpoints deployed
+        retracted: ship.powerRetractedDraw * ppEfficiency, // Total thermal output for all modules, hardpoints retracted
+        deployed: ship.powerDeployedDraw * ppEfficiency,   // Total thermal output for all modules, hardpoints deployed
       },
       thrusters: ship.standard[1].m.get('thermload'),  // Thermal output for Thrusters under max thrust
       fsd: ship.standard[2].m.get('thermload'),        // Thermal output for Frame Shift Drive while charging up
