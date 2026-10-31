@@ -2307,7 +2307,7 @@ export default class Ship {
     let thermalLoad = 0;
     let maxSpinupTime = 0;
     for (let slot of this.internal) {
-      if (slot.m && slot.m.grp === 'scb') {
+      if (slot.enabled && slot.m && slot.m.grp === 'scb') {
         thermalLoad += slot.m.get('thermload') / slot.m.get('spinup');
         maxSpinupTime = Math.max(maxSpinupTime, slot.m.get('spinup'));
       }
