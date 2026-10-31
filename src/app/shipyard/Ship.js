@@ -1502,21 +1502,21 @@ export default class Ship {
       bands[this.cargoHatch.priority].retracted += this.cargoHatch.m.getPowerUsage();
     }
 
-    for (let slotNum in this.standard) {
+    for (let slotNum in this.standard) { // core modules
       const slot = this.standard[slotNum];
       if (slot.m && slot.enabled) {
         bands[slot.priority][powerUsageType(slot, slot.m)] += slot.m.getPowerUsage();
       }
     }
 
-    for (let slotNum in this.internal) {
+    for (let slotNum in this.internal) { // optional internal
       const slot = this.internal[slotNum];
       if (slot.m && slot.enabled) {
         bands[slot.priority][powerUsageType(slot, slot.m)] += slot.m.getPowerUsage();
       }
     }
 
-    for (let slotNum in this.hardpoints) {
+    for (let slotNum in this.hardpoints) { // hardpoints (weapons + utility)
       const slot = this.hardpoints[slotNum];
       if (slot.m && slot.enabled) {
         bands[slot.priority][powerUsageType(slot, slot.m)] += slot.m.getPowerUsage();
