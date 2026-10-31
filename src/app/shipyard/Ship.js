@@ -2291,7 +2291,7 @@ export default class Ship {
 
   hasShieldCellBanksMounted() {
     for (let slot of this.internal) {
-      if (slot.m && slot.m.grp === 'scb') {
+      if (slot.m && slot.m.grp === 'scb') { // is this an SCB module?
         return true;
       }
     }
@@ -2307,7 +2307,7 @@ export default class Ship {
     let thermalLoad = 0;
     let maxSpinupTime = 0;
     for (let slot of this.internal) {
-      if (slot.enabled && slot.m && slot.m.grp === 'scb') {
+      if (slot.enabled && slot.m && slot.m.grp === 'scb') { // is this a (non-disabled) SCB module?
         thermalLoad += slot.m.get('thermload') / slot.m.get('spinup');
         maxSpinupTime = Math.max(maxSpinupTime, slot.m.get('spinup'));
       }
@@ -2334,13 +2334,13 @@ export default class Ship {
   };
 
   /**
-   * Get the sustained energy concumption per second, with all weapons firing, taking reloading into account.
+   * Get the sustained energy consumption per second, with all weapons firing, taking reloading into account.
    * @returns {number}
    */
   getSustainedHardpointEnergyDrawPerSecond(){
     let sustainedEnergyPerSecond = 0;
     for (let slot of this.hardpoints) {
-      if (slot.m) { // slot has a module fitted?
+      if (slot.enabled && slot.m) { // is this a (non-disabled) hardpoint (weapons + utility) module?
         sustainedEnergyPerSecond += (slot.m.getClip() ? (slot.m.getClip() * slot.m.getEps() / slot.m.getRoF()) / ((slot.m.getClip() / slot.m.getRoF()) + slot.m.getReload()) : slot.m.getEps());
       }
     }
@@ -2393,7 +2393,7 @@ export default class Ship {
     };
 
     for (let slot of this.hardpoints) {
-      if (slot.maxClass > 0 && slot.m) { // is this a non-utility hardpoint, with a module fitted?
+      if (slot.enabled && slot.m && slot.maxClass > 0) { // is this a (non-disabled) weapon module?
         const sustainedSecondsPerCycle = slot.m.getSustainedSecondsPerCycle() || 1;
         const thermalLoad = slot.m.get('thermload') * (slot.m.getSustainedFiringsPerCycle() / sustainedSecondsPerCycle);
         effectiveThermalLoad.weaponCapacitorFull += this.getEffectiveWeaponThermalLoad(thermalLoad, slot.m.get('distdraw'), pdWeaponCapacitor, 1);
