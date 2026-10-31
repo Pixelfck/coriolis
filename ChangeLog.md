@@ -1,3 +1,8 @@
+#4.1.17
+  * Fix Journal Import of ship JSON
+  * Fix slot names for T7 and T8
+#4.1.16
+  * Fine tune SLEF export for Spansh
 #4.1.15
   * Fix SLEF Export to work with Spansh
 #4.1.14
