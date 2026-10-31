@@ -1526,7 +1526,7 @@ export default class Ship {
     // Work out the running totals
     let prevRetracted = 0, prevDeployed = 0;
     for (let i = 0, l = bands.length; i < l; i++) {
-      let band = bands[i];
+      const band = bands[i];
       prevRetracted = band.retractedSum = prevRetracted + band.retracted;
       prevDeployed = band.deployedSum = prevDeployed + band.deployed + band.retracted;
     }
