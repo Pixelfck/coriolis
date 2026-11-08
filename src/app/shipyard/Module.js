@@ -1240,7 +1240,7 @@ export default class Module {
     const burstRateOfFire = this.get('burstrof') || 1; // Burst Rate of Fire
 
     let chargeTime = this.get('chargetime') || 0; // Time to reach maximum charge (in seconds)
-    chargeTime *= (this.get('damageMultiplier') ? 0 : 1);
+    chargeTime *= (this.get('damagemultiplier') ? 0 : 1);
     if (this.name === 'Imperial Hammer') { // TODO: bug? Imperial Hammer Rail Gun can keep firing through reloads without re-charging
       chargeTime = 0;
     }
