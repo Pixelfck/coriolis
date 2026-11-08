@@ -69,8 +69,6 @@ export function getLanguage(langCode) {
     return translated;
   };
 
-
-
   return {
     formats: {
       gen,                              // General number format (.e.g 1,001,001.1234)
