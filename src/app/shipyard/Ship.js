@@ -1550,8 +1550,10 @@ export default class Ship {
     // Update global stats
     this.powerRetracted = prevRetracted;
     this.powerDeployed = prevDeployed;
-    this.powerRetractedDraw = prevRetractedDraw;
-    this.powerDeployedDraw = prevDeployedDraw;
+    this.powerDraw = {
+      retracted: prevRetractedDraw,
+      deployed: prevDeployedDraw,
+    };
     this.priorityBands = bands;
 
     return this;
