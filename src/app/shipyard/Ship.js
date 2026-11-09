@@ -2531,7 +2531,6 @@ export default class Ship {
     const heatLevelPeak = 1.5 + (duration * (thermalLoad - this.heatDissipation) / this.heatCapacity);
     const timeCool = (heatLevelPeak - 1.5) / ((this.heatDissipation - thermalLoadBase) / this.heatCapacity);
 
-    // TODO: find a method to make this tooltip strings translatable?
     return {
       type: 'percentage',
       result: (heatLevelPeak / 1.5),
