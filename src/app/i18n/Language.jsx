@@ -12,8 +12,6 @@ import * as KO from './ko';
 import * as KA from './geo';
 import * as d3 from 'd3';
 
-let fallbackTerms = EN.terms;
-
 /**
  * Get the units, translation and format functions for the specified language
  * @param  {string} langCode ISO Language code
@@ -37,35 +35,50 @@ export function getLanguage(langCode) {
       lang = EN;
   }
 
-  let currentTerms = lang.terms;
-  let d3Locale = d3.formatLocale(lang.formats);
-  let gen = d3Locale.format('');
-  const round = function(x, n) { const ten_n = Math.pow(10,n); return Math.round(x * ten_n) / ten_n; };
+  const currentTerms = lang.terms;
+  const fallbackTerms = EN.terms;
+  const d3Locale = d3.formatLocale(lang.formats);
+  const gen = d3Locale.format('');
 
-  const indexedReplace = (string, args) => { for (let i = 0; i < args.length; i++) { string = string.replace('{' + i + '}', args[i]); } return string; };
+  /**
+   * Round a number to a give number of decimal places
+   * @param {number} number
+   * @param {number} decimals
+   * @returns {number}
+   */
+  const round = (number, decimals) => {
+    const ten_decimals = Math.pow(10, decimals);
+    return Math.round(number * ten_decimals) / ten_decimals;
+  };
 
-  translate = (t, x) => {
-    let translated;
+  /**
+   * Replace {0}, {1}, .. {n} placeholders in a string with the given value identified by their index in values
+   * @param {string} string the string to interpolate values in
+   * @param {array} values the indexed array with values to interpolate into string
+   * @returns {string}
+   */
+  const indexedReplace = (string, values) => {
+    if (!Array.isArray(values)) return string;
 
-    if (lang !== EN) {
-      translated = currentTerms[t]; // Localized terms
-      if (!translated && !Array.isArray(x)) {
-        translated = currentTerms[t + '_' + x]; // Localized terms
-      }
+    for (let i = 0; i < values.length; i++) {
+      string = string.replace('{' + i + '}', values[i]);
     }
+    return string;
+  };
 
-    if (!translated && !Array.isArray(x)) {
-      translated = fallbackTerms[t + '_' + x]; // Fallback (=English) terms
+  /**
+   * Localize (translate) a string
+   * @param {string} term The term to be localized
+   * @param {string} subTerm The sub-term to be localized
+   * @param {array} indexedValues An indexed array of values to interpolate into the localized string for the given term at the indicated placeholder
+   * @return {string} the localized term
+   */
+  translate = (term, subTerm, indexedValues) => {
+    const translated = currentTerms[term + '_' + subTerm] || currentTerms[term] || fallbackTerms[term + '_' + subTerm] || fallbackTerms[term] || term;
+
+    if (indexedValues) {
+      return indexedReplace(translated, indexedValues);
     }
-
-    if (!translated) {
-      translated = fallbackTerms[t] || t; // Fallback (=English) terms
-    }
-
-    if (Array.isArray(x)) {
-      translated = indexedReplace(translated, x);
-    }
-
     return translated;
   };
 

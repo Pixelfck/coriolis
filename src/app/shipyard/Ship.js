@@ -2537,7 +2537,7 @@ export default class Ship {
       type: 'percentage',
       result: (heatLevelPeak / 1.5),
       className: 'warning',
-      tooltip: translate('PHRASE_HEAT_TIME_UNTIL_TEMPORARY_OVERHEAT', [
+      tooltip: translate('PHRASE_HEAT_TIME_UNTIL_TEMPORARY_OVERHEAT', null, [
         (time10 + time15).toFixed(1),
         ((time10 + time15).toFixed(1) === '1.0' ? translate('second') : translate('seconds')),
         (duration + timeCool).toFixed(1),
