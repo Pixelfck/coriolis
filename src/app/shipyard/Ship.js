@@ -2534,14 +2534,13 @@ export default class Ship {
     const timeCool = (heatLevelPeak - 1.5) / ((this.heatDissipation - thermalLoadBase) / this.heatCapacity);
 
     return {
-      type: 'percentage',
-      result: (heatLevelPeak / 1.5),
+      type: 'time',
+      result: (time10 + time15),
       className: 'warning',
       tooltip: translate('PHRASE_HEAT_TIME_UNTIL_TEMPORARY_OVERHEAT', null, [
-        (time10 + time15).toFixed(1),
-        ((time10 + time15).toFixed(1) === '1.0' ? translate('second') : translate('seconds')),
-        (duration + timeCool).toFixed(1),
-        ((duration + timeCool).toFixed(1) === '1.0' ? translate('second') : translate('seconds')),
+        (heatLevelPeak * 100 / 1.5).toFixed(2),
+        Math.round(duration + timeCool),
+        (Math.round(duration + timeCool) === 1 ? translate('second') : translate('seconds')),
       ]),
     }
   };

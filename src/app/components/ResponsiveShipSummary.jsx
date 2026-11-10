@@ -531,7 +531,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                       ? heat_idle.result
                       : heat_idle.type === 'percentage'
                         ? formats.pct(heat_idle.result)
-                        : formats.time(heat_idle.result)}{heat_idle.type === 'time' ? u.s : null}</span></td>
+                        : formats.time(heat_idle.result)}</span></td>
                 </tr>
                 <tr>
                   <td className='label'>
@@ -616,7 +616,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                     ? heat_maxThrust.result
                     : heat_maxThrust.type === 'percentage'
                       ? formats.pct(heat_maxThrust.result)
-                      : formats.time(heat_maxThrust.result)}{heat_maxThrust.type === 'time' ? u.s : null}</span></td>
+                      : formats.time(heat_maxThrust.result)}</span></td>
               </tr>
               <tr>
                 <td
@@ -636,7 +636,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                     ? heat_maxThrustFsdCharging.result
                     : heat_maxThrustFsdCharging.type === 'percentage'
                       ? formats.pct(heat_maxThrustFsdCharging.result)
-                      : formats.time(heat_maxThrustFsdCharging.result)}{heat_maxThrustFsdCharging.type === 'time' ? u.s : null}</span></td>
+                      : formats.time(heat_maxThrustFsdCharging.result)}</span></td>
               </tr>
               <tr>
                 <td
@@ -656,7 +656,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                     ? heat_allWeaponsFiring_capacitorFull.result
                     : heat_allWeaponsFiring_capacitorFull.type === 'percentage'
                       ? formats.pct(heat_allWeaponsFiring_capacitorFull.result)
-                      : formats.time(heat_allWeaponsFiring_capacitorFull.result)}{heat_allWeaponsFiring_capacitorFull.type === 'time' ? u.s : null}{hasWeapons && heat_allWeaponsFiring_capacitorFull.type !== 'string'?'*':null}</span></td>
+                      : formats.time(heat_allWeaponsFiring_capacitorFull.result)}{hasWeapons && heat_allWeaponsFiring_capacitorFull.type !== 'string'?'*':null}</span></td>
               </tr>
               <tr>
                 <td
@@ -676,7 +676,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                     ? heat_allWeaponsFiring_capacitorNearEmpty.result
                     : heat_allWeaponsFiring_capacitorNearEmpty.type === 'percentage'
                       ? formats.pct(heat_allWeaponsFiring_capacitorNearEmpty.result)
-                      : formats.time(heat_allWeaponsFiring_capacitorNearEmpty.result)}{heat_allWeaponsFiring_capacitorNearEmpty.type === 'time' ? u.s : null}{hasWeapons && heat_allWeaponsFiring_capacitorNearEmpty.type !== 'string'?'*':null}</span></td>
+                      : formats.time(heat_allWeaponsFiring_capacitorNearEmpty.result)}{hasWeapons && heat_allWeaponsFiring_capacitorNearEmpty.type !== 'string'?'*':null}</span></td>
               </tr>
               <tr>
                 <td
@@ -696,7 +696,7 @@ export default class ResponsiveShipSummary extends TranslatedComponent {
                     ? heat_maxThrustSbcFiring.result
                     : heat_maxThrustSbcFiring.type === 'percentage'
                       ? formats.pct(heat_maxThrustSbcFiring.result)
-                      : formats.time(heat_maxThrustSbcFiring.result)}{heat_maxThrustSbcFiring.type === 'time' ? u.s : null}</span></td>
+                      : formats.time(heat_maxThrustSbcFiring.result)}</span></td>
               </tr>
               </tbody>
             </table>
