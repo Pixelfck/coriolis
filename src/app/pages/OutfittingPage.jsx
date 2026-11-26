@@ -9,6 +9,7 @@ import Ship from '../shipyard/Ship';
 import { getDefaultEdIDs } from '../shipyard/ModuleUtils';
 import * as _ from 'lodash';
 import { toDetailedBuild, toSLEF } from '../shipyard/Serializer';
+import { toSLTF } from '../shipyard/Serializer_SLTF';
 import { outfitURL } from '../utils/UrlGenerators';
 import {
   buildControlString,
@@ -622,13 +623,17 @@ export default class OutfittingPage extends Page {
         cmdrBuild={cmdrBuild}
         formats={[
           {
-            name: 'JSON',
-            data: toDetailedBuild(buildName, ship, ship.toString())
+            name: 'SLTF',
+            data: toSLTF(buildName, ship)
           },
           {
             name: 'SLEF',
             data: toSLEF(buildName, ship)
-          }
+          },
+          {
+            name: 'JSON',
+            data: toDetailedBuild(buildName, ship, ship.toString())
+          },
         ]}
       />
     );
