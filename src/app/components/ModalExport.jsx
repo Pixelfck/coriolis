@@ -30,6 +30,7 @@ export default class ModalExport extends TranslatedComponent {
    */
   constructor(props) {
     super(props);
+    this._copyToClipboard = this._copyToClipboard.bind(this)
 
     let exportJson;
     let formats = [];
@@ -153,12 +154,30 @@ export default class ModalExport extends TranslatedComponent {
     });
   }
 
+  async _copyToClipboard(event) {
+
+    const { language, termtip } = this.context;
+    const syntheticEvent = {currentTarget: event.target.closest('.export-copy-outer')};
+
+    if (this.exportField) {
+      try {
+        await navigator.clipboard.writeText(this.exportField.textContent);
+        termtip('TT_COPIED', { cap: 0 }, syntheticEvent);
+      } catch (error) {
+        termtip(language.translate('TT_COPY_FAILED', null, [error.message]), { cap: 0 }, syntheticEvent);
+      }
+    } else {
+      termtip('TT_NO_TEXT_TO_COPY', { cap: 0 }, syntheticEvent);
+    }
+  }
+
   /**
    * Render the modal
    * @return {React.Component} Modal Content
    */
   render() {
-    let translate = this.context.language.translate;
+    let { language, tooltip, termtip } = this.context;
+    let translate = language.translate;
     let description;
 
     if (this.props.description) {
@@ -186,10 +205,21 @@ export default class ModalExport extends TranslatedComponent {
       );
     }
 
+    const copyButton = (
+      <div class="export-copy-wrapper">
+        <div class="export-copy-outer" onMouseEnter={termtip.bind(null, 'TT_COPY_TO_CLIPBOARD')} onMouseLeave={tooltip.bind(null, null)}>
+          <div class="export-copy-inner">
+            <button onClick={this._copyToClipboard}>⎘</button>
+          </div>
+        </div>
+      </div>
+    );
+
     return <div className='modal' onClick={ (e) => e.stopPropagation() }>
       <h2>{translate(this.props.title || 'Export')}</h2>
       {description}
       {formatButtons}
+      {copyButton}
       <div>
         <textarea className='cb json' ref={node => this.exportField = node} readOnly value={this.state.exportJson} />
       </div>
