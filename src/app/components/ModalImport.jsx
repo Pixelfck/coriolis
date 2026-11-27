@@ -21,6 +21,80 @@ const mountMap = { 'H': 4, 'L': 3, 'M': 2, 'S': 1, 'U': 0 };
 const standardMap = { 'RB': 0, 'TM': 1, 'FH': 2, 'EC': 3, 'PC': 4, 'SS': 5, 'FS': 6 };
 const bhMap = { 'lightweight alloy': 0, 'reinforced alloy': 1, 'military grade composite': 2, 'mirrored surface composite': 3, 'reactive surface composite': 4 };
 
+const dataFormats = {
+  /**
+   * Test if importString matches EDSY (Elite: Dangerous Shipyard) text format signature
+   * @param importString
+   * @returns {boolean}
+   */
+  isEdsyTextFormat: function(importString) {
+    return textBuildRegex.test(importString); // EDSY build text
+  },
+
+  /**
+   * Test if importJSON matches the Inara SLEF (Ship Loadout Exchange Format) JSON format signature
+   * @param importJson the JSON Object to check for a signature match
+   * @returns {boolean} true if importJSON matches the signature, false otherwise
+   */
+  isInaraSlefFormat: function(importJson) {
+    return Boolean(importJson?.[0]?.header?.appName); // We assume only the SLEF format has this envelope data, so if it is present (see: https://inara.cz/elite/inara-impexp-slef/)
+  },
+
+  /**
+   * Test if importJSON matches the Companion Api single ship JSON format signature
+   * @param importJson the JSON Object to check for a signature match
+   * @returns {boolean} true if importJSON matches the signature, false otherwise
+   */
+  isCompanionApiSingleShipFormat: function(importJson) {
+    return Boolean(importJson.modules != null && importJson.modules.Armour != null); // Only the Companion API has this information
+  },
+
+  /**
+   Test if importJSON matches the Companion Api full data dump JSON format signature
+   * @param importJson the JSON Object to check for a signature match
+   * @returns {boolean} true if importJSON matches the signature, false otherwise
+   */
+  isCompanionApiFullDataFormat: function(importJson) {
+    return Boolean(importJson.ship != null && importJson.ship.modules != null && importJson.ship.modules.Armour != null); // Only the Companion API has this information
+  },
+
+  /**
+   * Test if importJSON matches our own Coriolis.io detailed export JSON format signature
+   * @param importJson the JSON Object to check for a signature match
+   * @returns {boolean} true if importJSON matches the signature, false otherwise
+   */
+  isCoriolisDetailedExportFormat: function(importJson) {
+    return Boolean(importJson instanceof Array); // Must be Coriolis detailed export json (i.e. an array of ships in https://coriolis.io/schemas/ship-loadout/5.json format)
+  },
+
+  /**
+   * Test if importJSON matches our own Coriolis.io single ship export JSON format signature
+   * @param importJson the JSON Object to check for a signature match
+   * @returns {boolean} true if importJSON matches the signature, false otherwise
+   */
+  isCoriolisSingleShipFormat: function(importJson) {
+    return Boolean(importJson.ship && typeof importJson.name !== undefined); // Must be Coriolis single ship export json (i.e. a single ships in https://coriolis.io/schemas/ship-loadout/5.json format)
+  },
+
+  /**
+   * Test if importJSON matches our own Coriolis.io full application backup JSON format signature
+   * @param importJson the JSON Object to check for a signature match
+   * @returns {boolean} true if importJSON matches the signature, false otherwise
+   */
+  isCoriolisFullBackupFormat: function(importJson) { // Using Coriolis Backup JSON
+    return Boolean(importJson.builds !== null && importJson.comparisons && importJson.insurance !== null && importJson.shipDiscount !== null && importJson.moduleDiscount !== null);
+  },
+
+  /**
+   * Test if importJSON matches the loadout event from the Elite: Dangerous game engine's journal files
+   * @param importJson the JSON Object to check for a signature match
+   * @returns {boolean} true if importJSON matches the signature, false otherwise
+   */
+  isEliteDangerousJournalFilesLoadoutEventFormat: function(importJson) {
+    return Boolean(importJson.Modules != null && importJson.Modules[0] != null); // Import a Loadout event from Elite: Dangerous journal files
+  },
+};
+
 /**
  * Check is slot is empty
  * @param  {Object}  slot Slot model
@@ -390,39 +464,74 @@ export default class ModalImport extends TranslatedComponent {
     }
 
     try {
-      if (textBuildRegex.test(importString)) {  // E:D Shipyard build text
+      if (dataFormats.isEdsyTextFormat(importString)) {
+        // EDSY Text format
         this._importTextBuild(importString);
-      } else {                                  // JSON Build data
+      } else { // Assume the data is JSON
         importData = JSON.parse(importString);
-
-        if (!importData || typeof importData != 'object') {
-          throw 'Must be an object or array!';
+        if (!importData || typeof importData !== 'object') {
+          const errorString = 'Parsed JSON must be an object or array!';
+          console.log(errorString);
+          this.setState({ errorMsg: errorString });
+          return;
         }
 
-        if (importData?.[0]?.header?.appName) { // has SLEF envelope?
+        // Inara SLEF
+        if (dataFormats.isInaraSlefFormat(importData)) {
           this._importSlefBuilds(importData);
-        } else if (importData.modules != null && importData.modules.Armour != null) { // Only the Companion API has this information
-          this._importCompanionApiBuild(importData); // Single ship definition
-        } else if (importData.ship != null && importData.ship.modules != null && importData.ship.modules.Armour != null) { // Only the Companion API has this information
-          this._importCompanionApiBuild(importData.ship); // Complete API dump
-        } else if (importData instanceof Array) {   // Must be detailed export json
-          this._importDetailedArray(importData);
-        } else if (importData.ship && typeof importData.name !== undefined) { // Using JSON from a single ship build export
-          this._importDetailedArray([importData]); // Convert to array with singleobject
-          this.setState({ singleBuild: true });
-        } else if (importData.Modules != null && importData.Modules[0] != null) {
-          this._importLoadout(importData);
-        } else { // Using Backup JSON
-          this._importBackup(importData);
+          this.setState({ importValid: true, singleBuild: true });
+          return;
         }
+
+        // Companion API formats
+        if (dataFormats.isCompanionApiSingleShipFormat(importData)) {
+          this._importCompanionApiBuild(importData); // Single ship definition
+          this.setState({ importValid: true, singleBuild: true });
+          return;
+        }
+
+        if (dataFormats.isCompanionApiFullDataFormat(importData)) {
+          this._importCompanionApiBuild(importData.ship); // Complete API dump
+          this.setState({ importValid: true });
+          return;
+        }
+
+        // Coriolis formats
+        if (dataFormats.isCoriolisDetailedExportFormat(importData)) {
+          this._importDetailedArray(importData);
+          this.setState({ importValid: true });
+          return;
+        }
+
+        if (dataFormats.isCoriolisSingleShipFormat(importData)) {
+          this._importDetailedArray([importData]); // Convert to array with single object
+          this.setState({ importValid: true, singleBuild: true });
+          return;
+        }
+
+        if (dataFormats.isCoriolisFullBackupFormat(importData)) {
+          this._importBackup(importData);
+          this.setState({ importValid: true });
+          return;
+        }
+
+        // Elite Dangerous Journal files events format
+        if (dataFormats.isEliteDangerousJournalFilesLoadoutEventFormat(importData)) {
+          this._importLoadout(importData);
+          this.setState({ importValid: true });
+          return;
+        }
+
+        const errorString = 'Provided data does not match any known signature!';
+        console.log(errorString);
+        this.setState({ errorMsg: errorString });
+        return;
       }
     } catch (e) {
       console.log(e);
-      this.setState({ errorMsg: (typeof e == 'string') ? e : 'Cannot Parse the data!' });
+      this.setState({ errorMsg: (typeof e == 'string') ? e : 'Expected JSON, but could not parse the data!' });
       return;
     }
-
-    this.setState({ importValid: true });
   };
 
   /**
