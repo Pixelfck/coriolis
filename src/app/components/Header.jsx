@@ -287,7 +287,7 @@ export default class Header extends TranslatedComponent {
   };
 
   /**
-   * Show export modal with detailed export
+   * Show export modal with for all ship builds
    * @param  {SyntheticEvent} e Event
    */
   _showDetailedExport(e) {
@@ -295,8 +295,8 @@ export default class Header extends TranslatedComponent {
     e.preventDefault();
 
     this.context.showModal(<ModalExport
-      title={translate('detailed export')}
-      description={translate('PHRASE_EXPORT_DESC')}
+      title={translate('export all ships')}
+      description={translate('PHRASE_EXPORT_ALL_DESC')}
       data={toDetailedExport(Persist.getBuilds())}
     />);
   }
@@ -537,7 +537,7 @@ export default class Header extends TranslatedComponent {
         <ul style={{ width: '100%' }}>
           {translate('builds')} & {translate('comparisons')}
           <li><Link href="#" className='block' onClick={this._showBackup.bind(this)}>{translate('full backup')}</Link></li>
-          <li><Link href="#" className='block' onClick={this._showDetailedExport.bind(this)}>{translate('detailed export')}</Link></li>
+          <li><Link href="#" className='block' onClick={this._showDetailedExport.bind(this)}>{translate('export all ships')}</Link></li>
           <li><Link href="#" className='block' onClick={this._showImport.bind(this)}>{translate('import')}</Link></li>
           <li><Link href="#" className='block' onClick={this._showDeleteAll.bind(this)}>{translate('delete all')}</Link></li>
         </ul>

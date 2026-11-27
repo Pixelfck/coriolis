@@ -60,12 +60,12 @@ function validateBuild(shipId, code, name) {
 }
 
 /**
- * Test if importJSON matches our own Coriolis.io detailed export JSON format signature
+ * Test if importJSON matches our own Coriolis.io All Ships JSON format signature
  * @param importJson the JSON Object to check for a signature match
  * @returns {boolean} true if importJSON matches the signature, false otherwise
  */
 export function isDetailedExportFormat(importJson) {
-  return Boolean(importJson instanceof Array); // Must be Coriolis detailed export json (i.e. an array of ships in https://coriolis.io/schemas/ship-loadout/5.json format)
+  return Boolean(importJson instanceof Array); // Must be Coriolis All Ships json (i.e. an array of ships in https://coriolis.io/schemas/ship-loadout/5.json format)
 }
 
 /**
