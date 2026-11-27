@@ -9,9 +9,8 @@ import { Download } from './SvgIcons';
 import { outfitURL } from '../utils/UrlGenerators';
 import { shipFromEdsyText } from '../utils/ImportFormatsEDSY';
 import { shipFromInaraSlef } from "../utils/ImportFormatsInara";
-import { shipFromCompanionApi } from "../utils/ImportFormatsCompanionApi";
 import { shipFromCoriolisDetailedFormat, shipFromCoriolisSingleShipFormat, backupFromCoriolisFullBackupFormat } from "../utils/ImportFormatsCoriolis";
-import { shipFromEdGameEngineJournalFileLoadoutEvent } from "../utils/ImportFormatsFrontier";
+import { shipFromEdCompanionApi, shipFromEdGameEngineJournalFileLoadoutEvent } from "../utils/ImportFormatsED";
 
 const dataFormats = {
   /**
@@ -39,7 +38,7 @@ const dataFormats = {
    * @param importJson the JSON Object to check for a signature match
    * @returns {boolean} true if importJSON matches the signature, false otherwise
    */
-  isCompanionApiSingleShipFormat: function(importJson) {
+  isFrontierCompanionApiSingleShipFormat: function(importJson) {
     return Boolean(importJson.modules != null && importJson.modules.Armour != null); // Only the Companion API has this information
   },
 
@@ -48,8 +47,17 @@ const dataFormats = {
    * @param importJson the JSON Object to check for a signature match
    * @returns {boolean} true if importJSON matches the signature, false otherwise
    */
-  isCompanionApiFullDataFormat: function(importJson) {
+  isEliteDangerousCompanionApiFullDataFormat: function(importJson) {
     return Boolean(importJson.ship != null && importJson.ship.modules != null && importJson.ship.modules.Armour != null); // Only the Companion API has this information
+  },
+
+  /**
+   * Test if importJSON matches the loadout event from the Elite: Dangerous game engine's journal files
+   * @param importJson the JSON Object to check for a signature match
+   * @returns {boolean} true if importJSON matches the signature, false otherwise
+   */
+  isEliteDangerousJournalFilesLoadoutEventFormat: function(importJson) {
+    return Boolean(importJson.Modules != null && importJson.Modules[0] != null); // Import a Loadout event from Elite: Dangerous journal files
   },
 
   /**
@@ -77,15 +85,6 @@ const dataFormats = {
    */
   isCoriolisFullBackupFormat: function(importJson) { // Using Coriolis Backup JSON
     return Boolean(importJson.builds !== null && importJson.comparisons && importJson.insurance !== null && importJson.shipDiscount !== null && importJson.moduleDiscount !== null);
-  },
-
-  /**
-   * Test if importJSON matches the loadout event from the Elite: Dangerous game engine's journal files
-   * @param importJson the JSON Object to check for a signature match
-   * @returns {boolean} true if importJSON matches the signature, false otherwise
-   */
-  isEliteDangerousJournalFilesLoadoutEventFormat: function(importJson) {
-    return Boolean(importJson.Modules != null && importJson.Modules[0] != null); // Import a Loadout event from Elite: Dangerous journal files
   },
 };
 
@@ -163,13 +162,13 @@ export default class ModalImport extends TranslatedComponent {
           return;
         }
 
-        // Companion API formats
-        if (dataFormats.isCompanionApiSingleShipFormat(importData)) {
-          this.setState(shipFromCompanionApi(importData)); // Single ship definition
+        // Frontier/Elite Dangerous Companion API formats
+        if (dataFormats.isFrontierCompanionApiSingleShipFormat(importData)) {
+          this.setState(shipFromEdCompanionApi(importData)); // Single ship definition
           return;
         }
-        if (dataFormats.isCompanionApiFullDataFormat(importData)) {
-          this.setState(shipFromCompanionApi(importData.ship)); // Complete API dump
+        if (dataFormats.isEliteDangerousCompanionApiFullDataFormat(importData)) {
+          this.setState(shipFromEdCompanionApi(importData.ship)); // Complete API dump
           return;
         }
 
@@ -187,7 +186,7 @@ export default class ModalImport extends TranslatedComponent {
           return;
         }
 
-        // Elite Dangerous Journal files events format
+        // Frontier/Elite Dangerous game engine journal files loadout events format
         if (dataFormats.isEliteDangerousJournalFilesLoadoutEventFormat(importData)) {
           this.setState(shipFromEdGameEngineJournalFileLoadoutEvent(importData));
           return;
