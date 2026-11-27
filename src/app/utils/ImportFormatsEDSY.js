@@ -25,7 +25,7 @@ function isEmptySlot(slot) {
  * @param importString
  * @returns {boolean}
  */
-export function isEdsyTextFormat(importString) {
+export function isTextFormat(importString) {
   return textBuildRegex.test(importString); // EDSY build text
 }
 
@@ -34,7 +34,7 @@ export function isEdsyTextFormat(importString) {
  * @param  {string} buildStr Build string
  * @throws {string} If parse / import fails
  */
-export function shipFromEdsyText(buildStr) {
+export function shipFromTextFormat(buildStr) {
   let buildName = textBuildRegex.exec(buildStr)[1].trim();
   let shipName = buildName.toLowerCase();
   let shipId = null;

@@ -9,7 +9,7 @@ import { Ships } from 'coriolis-data/dist';
  * @param importJson the JSON Object to check for a signature match
  * @returns {boolean} true if importJSON matches the signature, false otherwise
  */
-export function isInaraSlefFormat(importJson) {
+export function isSlefFormat(importJson) {
   return Boolean(importJson?.[0]?.header?.appName); // We assume only the SLEF format has this envelope data, so if it is present (see: https://inara.cz/elite/inara-impexp-slef/)
 }
 
@@ -20,7 +20,7 @@ export function isInaraSlefFormat(importJson) {
  * @param  {string} importData - Array of the list of builds.
  * @throws {string} If parse / import fails
  */
-export function shipFromInaraSlef(importData) {
+export function shipFromSlefFormat(importData) {
   const builds = importData.reduce((memo, { data }) => {
     const shipModel = shipModelFromJson(data);
     const ship = shipFromLoadoutJSON(data);

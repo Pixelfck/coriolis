@@ -3,14 +3,12 @@ import {shipFromJson, shipModelFromJson} from "./CompanionApiUtils";
 import { Ships } from 'coriolis-data/dist';
 import { shipFromLoadoutJSON } from './JournalUtils';
 
-
-
 /**
  * Test if importJSON matches the Companion Api single ship JSON format signature
  * @param importJson the JSON Object to check for a signature match
  * @returns {boolean} true if importJSON matches the signature, false otherwise
  */
-export function isEliteDangerousCompanionApiSingleShipFormat(importJson) {
+export function isCompanionApiSingleShipFormat(importJson) {
   return Boolean(importJson.modules != null && importJson.modules.Armour != null); // Only the Companion API has this information
 }
 
@@ -19,7 +17,7 @@ export function isEliteDangerousCompanionApiSingleShipFormat(importJson) {
  * @param importJson the JSON Object to check for a signature match
  * @returns {boolean} true if importJSON matches the signature, false otherwise
  */
-export function isEliteDangerousCompanionApiFullDataFormat(importJson) {
+export function isCompanionApiFullDataFormat(importJson) {
   return Boolean(importJson.ship != null && importJson.ship.modules != null && importJson.ship.modules.Armour != null); // Only the Companion API has this information
 }
 
@@ -28,7 +26,7 @@ export function isEliteDangerousCompanionApiFullDataFormat(importJson) {
  * @param importJson the JSON Object to check for a signature match
  * @returns {boolean} true if importJSON matches the signature, false otherwise
  */
-export function isEliteDangerousJournalFilesLoadoutEventFormat(importJson) {
+export function isJournalFilesLoadoutEventFormat(importJson) {
   return Boolean(importJson.Modules != null && importJson.Modules[0] != null); // Import a Loadout event from Elite: Dangerous journal files
 }
 
@@ -37,7 +35,7 @@ export function isEliteDangerousJournalFilesLoadoutEventFormat(importJson) {
  * @param  {string} build JSON from the Companion API information
  * @throws {string} if parse/import fails
  */
-export function shipFromEdCompanionApi(importData) {
+export function shipFromEdCompanionApiFormat(importData) {
   const shipModel = shipModelFromJson(importData);
   const ship = shipFromJson(importData);
 
@@ -48,13 +46,12 @@ export function shipFromEdCompanionApi(importData) {
   return { builds, importValid: true, singleBuild: true };
 }
 
-
 /**
  * Import a Loadout event from Elite: Dangerous journal files
  * @param  {Object} importData Loadout event
  * @throws {string} If import fails
  */
-export function shipFromEdGameEngineJournalFileLoadoutEvent(importData) {
+export function shipFromJournalFileLoadoutEventFormat(importData) {
   if (!(importData && importData.Ship && importData.Modules)) {
     throw 'Loadout event must contain Ship and Modules';
   }

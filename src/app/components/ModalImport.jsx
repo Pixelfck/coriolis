@@ -68,8 +68,8 @@ export default class ModalImport extends TranslatedComponent {
     });
 
     try {
-      if (ImportFormatsEDSY.isEdsyTextFormat(importString)) { // EDSY Text ?
-        this.setState(ImportFormatsEDSY.shipFromEdsyText(importString));
+      if (ImportFormatsEDSY.isTextFormat(importString)) { // EDSY Text ?
+        this.setState(ImportFormatsEDSY.shipFromTextFormat(importString));
       } else { // Assume the data is JSON
         const importData = JSON.parse(importString);
         if (!importData || typeof importData !== 'object') {
@@ -80,38 +80,38 @@ export default class ModalImport extends TranslatedComponent {
         }
 
         // Inara SLEF format
-        if (ImportFormatsInara.isInaraSlefFormat(importData)) {
-          this.setState(ImportFormatsInara.shipFromInaraSlef(importData));
+        if (ImportFormatsInara.isSlefFormat(importData)) {
+          this.setState(ImportFormatsInara.shipFromSlefFormat(importData));
           return;
         }
 
         // Frontier/Elite Dangerous Companion API formats
-        if (ImportFormatsED.isEliteDangerousCompanionApiSingleShipFormat(importData)) {
-          this.setState(ImportFormatsED.shipFromEdCompanionApi(importData)); // Single ship definition
+        if (ImportFormatsED.isCompanionApiSingleShipFormat(importData)) {
+          this.setState(ImportFormatsED.shipFromEdCompanionApiFormat(importData)); // Single ship definition
           return;
         }
-        if (ImportFormatsED.isEliteDangerousCompanionApiFullDataFormat(importData)) {
-          this.setState(ImportFormatsED.shipFromEdCompanionApi(importData.ship)); // Complete API dump
+        if (ImportFormatsED.isCompanionApiFullDataFormat(importData)) {
+          this.setState(ImportFormatsED.shipFromEdCompanionApiFormat(importData.ship)); // Complete API dump
           return;
         }
 
         // Coriolis formats
-        if (ImportFormatsCoriolis.isCoriolisDetailedExportFormat(importData)) {
-          this.setState(ImportFormatsCoriolis.shipFromCoriolisDetailedFormat(importData));
+        if (ImportFormatsCoriolis.isDetailedExportFormat(importData)) {
+          this.setState(ImportFormatsCoriolis.shipFromDetailedFormat(importData));
           return;
         }
-        if (ImportFormatsCoriolis.isCoriolisSingleShipFormat(importData)) {
-          this.setState(ImportFormatsCoriolis.shipFromCoriolisSingleShipFormat(importData));
+        if (ImportFormatsCoriolis.isSingleShipJsonFormat(importData)) {
+          this.setState(ImportFormatsCoriolis.shipFromSingleShipJsonFormat(importData));
           return;
         }
-        if (ImportFormatsCoriolis.isCoriolisFullBackupFormat(importData)) {
-          this.setState(ImportFormatsCoriolis.backupFromCoriolisFullBackupFormat(importData));
+        if (ImportFormatsCoriolis.isFullBackupFormat(importData)) {
+          this.setState(ImportFormatsCoriolis.backupFromFullBackupFormat(importData));
           return;
         }
 
         // Frontier/Elite Dangerous game engine journal files loadout events format
-        if (ImportFormatsED.isEliteDangerousJournalFilesLoadoutEventFormat(importData)) {
-          this.setState(ImportFormatsED.shipFromEdGameEngineJournalFileLoadoutEvent(importData));
+        if (ImportFormatsED.isJournalFilesLoadoutEventFormat(importData)) {
+          this.setState(ImportFormatsED.shipFromJournalFileLoadoutEventFormat(importData));
           return;
         }
 
