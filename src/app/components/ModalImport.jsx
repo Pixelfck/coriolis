@@ -7,14 +7,11 @@ import Persist from '../stores/Persist';
 import { Ships } from 'coriolis-data/dist';
 import { Download } from './SvgIcons';
 import { outfitURL } from '../utils/UrlGenerators';
-import { shipModelFromJson } from '../utils/CompanionApiUtils';
-import { shipFromLoadoutJSON } from '../utils/JournalUtils';
 import { shipFromEdsyText } from '../utils/ImportFormatsEDSY';
 import { shipFromInaraSlef } from "../utils/ImportFormatsInara";
 import { shipFromCompanionApi } from "../utils/ImportFormatsCompanionApi";
 import { shipFromCoriolisDetailedFormat, shipFromCoriolisSingleShipFormat, backupFromCoriolisFullBackupFormat } from "../utils/ImportFormatsCoriolis";
-
-
+import { shipFromEdGameEngineJournalFileLoadoutEvent } from "../utils/ImportFormatsFrontier";
 
 const dataFormats = {
   /**
@@ -97,7 +94,6 @@ const dataFormats = {
  */
 export default class ModalImport extends TranslatedComponent {
 
-
   static propTypes = {
     importString: PropTypes.string, // Optional: Default data for import modal
     builds: PropTypes.object,  // Optional: Import object
@@ -127,37 +123,6 @@ export default class ModalImport extends TranslatedComponent {
     this._importLoadout = this._importLoadout.bind(this);
     this._validateImport = this._validateImport.bind(this);
   }
-
-  /**
-   * Import a Loadout event from Elite: Dangerous journal files
-   * @param  {Object} data Loadout event
-   * @throws {string} If import fails
-   */
-  _importLoadout(data) {
-    if (!(data && data.Ship && data.Modules)) {
-      throw 'Loadout event must contain Ship and Modules';
-    }
-    // Build the ship here, exactly as a single SLEF build is imported (a SLEF
-    // `data` object IS a journal Loadout event). This used to gzip the event
-    // into a /import?data= URL instead, which broke with pako 2 (deflate no
-    // longer supports { to: 'string' }) and could exceed browser URL limits
-    // for large ships.
-    const shipModel = shipModelFromJson(data);
-    if (!shipModel || !Ships[shipModel]) {
-      throw 'No such ship found: "' + data.Ship + '"';
-    }
-    let ship;
-    try {
-      ship = shipFromLoadoutJSON(data);
-    } catch (e) {
-      throw Ships[shipModel].properties.name + ' loadout could not be imported: ' + (typeof e == 'string' ? e : e.message);
-    }
-    const shipName = data.ShipName || Ships[shipModel].properties.name;
-    const builds = { [shipModel]: { [`Imported ${shipName}`]: ship.toString() } };
-    this.setState({ builds, singleBuild: true });
-  }
-
-
 
   /**
    * Validate the import string / text box contents
@@ -224,8 +189,7 @@ export default class ModalImport extends TranslatedComponent {
 
         // Elite Dangerous Journal files events format
         if (dataFormats.isEliteDangerousJournalFilesLoadoutEventFormat(importData)) {
-          this._importLoadout(importData);
-          this.setState({ importValid: true });
+          this.setState(shipFromEdGameEngineJournalFileLoadoutEvent(importData));
           return;
         }
 
