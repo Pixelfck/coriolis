@@ -14,6 +14,7 @@ import { outfitURL } from '../utils/UrlGenerators';
 import { shipFromJson, shipModelFromJson } from '../utils/CompanionApiUtils';
 import { shipFromLoadoutJSON } from '../utils/JournalUtils';
 import { shipFromEdsyText } from '../utils/ImportFormatsEDSY';
+import { shipFromInaraSlef } from "../utils/ImportFormatsInara";
 
 
 
@@ -304,29 +305,6 @@ export default class ModalImport extends TranslatedComponent {
   }
 
 
-  /**
-   * Import SLEF formatted builds. Sets state to a map of the builds on success
-   * and flags if there was only a single build.
-   *
-   * @param  {string} importData - Array of the list of builds.
-   * @throws {string} If parse / import fails
-   */
-  _importSlefBuilds(importData) {
-    const builds = importData.reduce((memo, { data }) => {
-      const shipModel = shipModelFromJson(data);
-      const ship = shipFromLoadoutJSON(data);
-      const shipTemplate = Ships[shipModel];
-      const shipName = data.ShipName || shipTemplate.properties.name;
-
-      const key = `Imported ${shipName}`;
-      memo[shipModel] = {};
-      memo[shipModel][key] = ship.toString();
-
-      return memo;
-    }, {});
-
-    this.setState({ builds, singleBuild: Object.keys(builds).length === 1 });
-  }
 
   /**
    * Validate the import string / text box contents
@@ -366,8 +344,7 @@ export default class ModalImport extends TranslatedComponent {
 
         // Inara SLEF format
         if (dataFormats.isInaraSlefFormat(importData)) {
-          this._importSlefBuilds(importData);
-          this.setState({ importValid: true, singleBuild: true });
+          this.setState(shipFromInaraSlef(importData));
           return;
         }
 
