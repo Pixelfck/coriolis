@@ -21,6 +21,15 @@ function isEmptySlot(slot) {
 }
 
 /**
+ * Test if importString matches EDSY (Elite: Dangerous Shipyard) text format signature
+ * @param importString
+ * @returns {boolean}
+ */
+export function isEdsyTextFormat(importString) {
+  return textBuildRegex.test(importString); // EDSY build text
+}
+
+/**
  * Import a text build from ED Shipyard
  * @param  {string} buildStr Build string
  * @throws {string} If parse / import fails

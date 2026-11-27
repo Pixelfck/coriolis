@@ -32,6 +32,32 @@ function detailedJsonToBuild(detailedBuild) {
   return { shipId: ship.id, name: detailedBuild.name, code: ship.toString() };
 }
 
+/**
+ * Test if importJSON matches our own Coriolis.io detailed export JSON format signature
+ * @param importJson the JSON Object to check for a signature match
+ * @returns {boolean} true if importJSON matches the signature, false otherwise
+ */
+export function isCoriolisDetailedExportFormat(importJson) {
+  return Boolean(importJson instanceof Array); // Must be Coriolis detailed export json (i.e. an array of ships in https://coriolis.io/schemas/ship-loadout/5.json format)
+}
+
+/**
+ * Test if importJSON matches our own Coriolis.io single ship export JSON format signature
+ * @param importJson the JSON Object to check for a signature match
+ * @returns {boolean} true if importJSON matches the signature, false otherwise
+ */
+export function isCoriolisSingleShipFormat(importJson) {
+  return Boolean(importJson.ship && typeof importJson.name !== undefined); // Must be Coriolis single ship export json (i.e. a single ships in https://coriolis.io/schemas/ship-loadout/5.json format)
+}
+
+/**
+ * Test if importJSON matches our own Coriolis.io full application backup JSON format signature
+ * @param importJson the JSON Object to check for a signature match
+ * @returns {boolean} true if importJSON matches the signature, false otherwise
+ */
+export function isCoriolisFullBackupFormat(importJson) { // Using Coriolis Backup JSON
+  return Boolean(importJson.builds !== null && importJson.comparisons && importJson.insurance !== null && importJson.shipDiscount !== null && importJson.moduleDiscount !== null);
+}
 
 /**
  * Import an array of ship-loadout objects / builds

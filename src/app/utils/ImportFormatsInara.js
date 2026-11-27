@@ -5,6 +5,15 @@ import { shipFromLoadoutJSON } from "./JournalUtils";
 import { Ships } from 'coriolis-data/dist';
 
 /**
+ * Test if importJSON matches the Inara SLEF (Ship Loadout Exchange Format) JSON format signature
+ * @param importJson the JSON Object to check for a signature match
+ * @returns {boolean} true if importJSON matches the signature, false otherwise
+ */
+export function isInaraSlefFormat(importJson) {
+  return Boolean(importJson?.[0]?.header?.appName); // We assume only the SLEF format has this envelope data, so if it is present (see: https://inara.cz/elite/inara-impexp-slef/)
+}
+
+/**
  * Import SLEF formatted builds. Sets state to a map of the builds on success
  * and flags if there was only a single build.
  *

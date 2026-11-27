@@ -7,86 +7,10 @@ import Persist from '../stores/Persist';
 import { Ships } from 'coriolis-data/dist';
 import { Download } from './SvgIcons';
 import { outfitURL } from '../utils/UrlGenerators';
-import { shipFromEdsyText } from '../utils/ImportFormatsEDSY';
-import { shipFromInaraSlef } from "../utils/ImportFormatsInara";
-import { shipFromCoriolisDetailedFormat, shipFromCoriolisSingleShipFormat, backupFromCoriolisFullBackupFormat } from "../utils/ImportFormatsCoriolis";
-import { shipFromEdCompanionApi, shipFromEdGameEngineJournalFileLoadoutEvent } from "../utils/ImportFormatsED";
-
-const dataFormats = {
-  /**
-   * Test if importString matches EDSY (Elite: Dangerous Shipyard) text format signature
-   * @param importString
-   * @returns {boolean}
-   */
-  isEdsyTextFormat: function(importString) {
-    const textBuildRegex = new RegExp('^\\[([\\w \\-]+)\\]( \\[([+\\d]+)\\])?\r?\n');
-
-    return textBuildRegex.test(importString); // EDSY build text
-  },
-
-  /**
-   * Test if importJSON matches the Inara SLEF (Ship Loadout Exchange Format) JSON format signature
-   * @param importJson the JSON Object to check for a signature match
-   * @returns {boolean} true if importJSON matches the signature, false otherwise
-   */
-  isInaraSlefFormat: function(importJson) {
-    return Boolean(importJson?.[0]?.header?.appName); // We assume only the SLEF format has this envelope data, so if it is present (see: https://inara.cz/elite/inara-impexp-slef/)
-  },
-
-  /**
-   * Test if importJSON matches the Companion Api single ship JSON format signature
-   * @param importJson the JSON Object to check for a signature match
-   * @returns {boolean} true if importJSON matches the signature, false otherwise
-   */
-  isFrontierCompanionApiSingleShipFormat: function(importJson) {
-    return Boolean(importJson.modules != null && importJson.modules.Armour != null); // Only the Companion API has this information
-  },
-
-  /**
-   Test if importJSON matches the Companion Api full data dump JSON format signature
-   * @param importJson the JSON Object to check for a signature match
-   * @returns {boolean} true if importJSON matches the signature, false otherwise
-   */
-  isEliteDangerousCompanionApiFullDataFormat: function(importJson) {
-    return Boolean(importJson.ship != null && importJson.ship.modules != null && importJson.ship.modules.Armour != null); // Only the Companion API has this information
-  },
-
-  /**
-   * Test if importJSON matches the loadout event from the Elite: Dangerous game engine's journal files
-   * @param importJson the JSON Object to check for a signature match
-   * @returns {boolean} true if importJSON matches the signature, false otherwise
-   */
-  isEliteDangerousJournalFilesLoadoutEventFormat: function(importJson) {
-    return Boolean(importJson.Modules != null && importJson.Modules[0] != null); // Import a Loadout event from Elite: Dangerous journal files
-  },
-
-  /**
-   * Test if importJSON matches our own Coriolis.io detailed export JSON format signature
-   * @param importJson the JSON Object to check for a signature match
-   * @returns {boolean} true if importJSON matches the signature, false otherwise
-   */
-  isCoriolisDetailedExportFormat: function(importJson) {
-    return Boolean(importJson instanceof Array); // Must be Coriolis detailed export json (i.e. an array of ships in https://coriolis.io/schemas/ship-loadout/5.json format)
-  },
-
-  /**
-   * Test if importJSON matches our own Coriolis.io single ship export JSON format signature
-   * @param importJson the JSON Object to check for a signature match
-   * @returns {boolean} true if importJSON matches the signature, false otherwise
-   */
-  isCoriolisSingleShipFormat: function(importJson) {
-    return Boolean(importJson.ship && typeof importJson.name !== undefined); // Must be Coriolis single ship export json (i.e. a single ships in https://coriolis.io/schemas/ship-loadout/5.json format)
-  },
-
-  /**
-   * Test if importJSON matches our own Coriolis.io full application backup JSON format signature
-   * @param importJson the JSON Object to check for a signature match
-   * @returns {boolean} true if importJSON matches the signature, false otherwise
-   */
-  isCoriolisFullBackupFormat: function(importJson) { // Using Coriolis Backup JSON
-    return Boolean(importJson.builds !== null && importJson.comparisons && importJson.insurance !== null && importJson.shipDiscount !== null && importJson.moduleDiscount !== null);
-  },
-};
+import * as ImportFormatsEDSY from '../utils/ImportFormatsEDSY';
+import * as ImportFormatsInara from "../utils/ImportFormatsInara";
+import * as ImportFormatsED from "../utils/ImportFormatsED";
+import * as ImportFormatsCoriolis from "../utils/ImportFormatsCoriolis";
 
 /**
  * Import Modal
@@ -119,7 +43,6 @@ export default class ModalImport extends TranslatedComponent {
 
     this._process = this._process.bind(this);
     this._import = this._import.bind(this);
-    this._importLoadout = this._importLoadout.bind(this);
     this._validateImport = this._validateImport.bind(this);
   }
 
@@ -145,8 +68,8 @@ export default class ModalImport extends TranslatedComponent {
     });
 
     try {
-      if (dataFormats.isEdsyTextFormat(importString)) { // EDSY Text ?
-        this.setState(shipFromEdsyText(importString));
+      if (ImportFormatsEDSY.isEdsyTextFormat(importString)) { // EDSY Text ?
+        this.setState(ImportFormatsEDSY.shipFromEdsyText(importString));
       } else { // Assume the data is JSON
         const importData = JSON.parse(importString);
         if (!importData || typeof importData !== 'object') {
@@ -157,38 +80,38 @@ export default class ModalImport extends TranslatedComponent {
         }
 
         // Inara SLEF format
-        if (dataFormats.isInaraSlefFormat(importData)) {
-          this.setState(shipFromInaraSlef(importData));
+        if (ImportFormatsInara.isInaraSlefFormat(importData)) {
+          this.setState(ImportFormatsInara.shipFromInaraSlef(importData));
           return;
         }
 
         // Frontier/Elite Dangerous Companion API formats
-        if (dataFormats.isFrontierCompanionApiSingleShipFormat(importData)) {
-          this.setState(shipFromEdCompanionApi(importData)); // Single ship definition
+        if (ImportFormatsED.isEliteDangerousCompanionApiSingleShipFormat(importData)) {
+          this.setState(ImportFormatsED.shipFromEdCompanionApi(importData)); // Single ship definition
           return;
         }
-        if (dataFormats.isEliteDangerousCompanionApiFullDataFormat(importData)) {
-          this.setState(shipFromEdCompanionApi(importData.ship)); // Complete API dump
+        if (ImportFormatsED.isEliteDangerousCompanionApiFullDataFormat(importData)) {
+          this.setState(ImportFormatsED.shipFromEdCompanionApi(importData.ship)); // Complete API dump
           return;
         }
 
         // Coriolis formats
-        if (dataFormats.isCoriolisDetailedExportFormat(importData)) {
-          this.setState(shipFromCoriolisDetailedFormat(importData));
+        if (ImportFormatsCoriolis.isCoriolisDetailedExportFormat(importData)) {
+          this.setState(ImportFormatsCoriolis.shipFromCoriolisDetailedFormat(importData));
           return;
         }
-        if (dataFormats.isCoriolisSingleShipFormat(importData)) {
-          this.setState(shipFromCoriolisSingleShipFormat(importData));
+        if (ImportFormatsCoriolis.isCoriolisSingleShipFormat(importData)) {
+          this.setState(ImportFormatsCoriolis.shipFromCoriolisSingleShipFormat(importData));
           return;
         }
-        if (dataFormats.isCoriolisFullBackupFormat(importData)) {
-          this.setState(backupFromCoriolisFullBackupFormat(importData));
+        if (ImportFormatsCoriolis.isCoriolisFullBackupFormat(importData)) {
+          this.setState(ImportFormatsCoriolis.backupFromCoriolisFullBackupFormat(importData));
           return;
         }
 
         // Frontier/Elite Dangerous game engine journal files loadout events format
-        if (dataFormats.isEliteDangerousJournalFilesLoadoutEventFormat(importData)) {
-          this.setState(shipFromEdGameEngineJournalFileLoadoutEvent(importData));
+        if (ImportFormatsED.isEliteDangerousJournalFilesLoadoutEventFormat(importData)) {
+          this.setState(ImportFormatsED.shipFromEdGameEngineJournalFileLoadoutEvent(importData));
           return;
         }
 

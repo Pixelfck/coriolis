@@ -4,6 +4,34 @@ import { Ships } from 'coriolis-data/dist';
 import { shipFromLoadoutJSON } from './JournalUtils';
 
 
+
+/**
+ * Test if importJSON matches the Companion Api single ship JSON format signature
+ * @param importJson the JSON Object to check for a signature match
+ * @returns {boolean} true if importJSON matches the signature, false otherwise
+ */
+export function isEliteDangerousCompanionApiSingleShipFormat(importJson) {
+  return Boolean(importJson.modules != null && importJson.modules.Armour != null); // Only the Companion API has this information
+}
+
+/**
+ Test if importJSON matches the Companion Api full data dump JSON format signature
+ * @param importJson the JSON Object to check for a signature match
+ * @returns {boolean} true if importJSON matches the signature, false otherwise
+ */
+export function isEliteDangerousCompanionApiFullDataFormat(importJson) {
+  return Boolean(importJson.ship != null && importJson.ship.modules != null && importJson.ship.modules.Armour != null); // Only the Companion API has this information
+}
+
+/**
+ * Test if importJSON matches the loadout event from the Elite: Dangerous game engine's journal files
+ * @param importJson the JSON Object to check for a signature match
+ * @returns {boolean} true if importJSON matches the signature, false otherwise
+ */
+export function isEliteDangerousJournalFilesLoadoutEventFormat(importJson) {
+  return Boolean(importJson.Modules != null && importJson.Modules[0] != null); // Import a Loadout event from Elite: Dangerous journal files
+}
+
 /**
  * Import a build direct from the Companion API
  * @param  {string} build JSON from the Companion API information
