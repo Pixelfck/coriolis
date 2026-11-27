@@ -5,17 +5,14 @@ import TranslatedComponent from './TranslatedComponent';
 import Router from '../Router';
 import Persist from '../stores/Persist';
 import { Ships } from 'coriolis-data/dist';
-import Ship from '../shipyard/Ship';
-import { Insurance } from '../shipyard/Constants';
-import * as ModuleUtils from '../shipyard/ModuleUtils';
-import { fromDetailedBuild } from '../shipyard/Serializer';
 import { Download } from './SvgIcons';
 import { outfitURL } from '../utils/UrlGenerators';
-import { shipFromJson, shipModelFromJson } from '../utils/CompanionApiUtils';
+import { shipModelFromJson } from '../utils/CompanionApiUtils';
 import { shipFromLoadoutJSON } from '../utils/JournalUtils';
 import { shipFromEdsyText } from '../utils/ImportFormatsEDSY';
 import { shipFromInaraSlef } from "../utils/ImportFormatsInara";
 import { shipFromCompanionApi } from "../utils/ImportFormatsCompanionApi";
+import { shipFromCoriolisDetailedFormat, shipFromCoriolisSingleShipFormat, backupFromCoriolisFullBackupFormat } from "../utils/ImportFormatsCoriolis";
 
 
 
@@ -95,61 +92,6 @@ const dataFormats = {
   },
 };
 
-
-/**
- * Determine if a build is valid
- * @param  {string} shipId Ship ID
- * @param  {string} code   Serialzied ship build 'code'
- * @param  {string} name   Build name
- * @throws {string} If build is not valid
- */
-function validateBuild(shipId, code, name) {
-  let shipData = Ships[shipId];
-
-  if (!shipData) {
-    throw '"' + shipId + '" is not a valid Ship Id!';
-  }
-  if (typeof name != 'string' || name.length == 0) {
-    throw shipData.properties.name + ' build "' + name + '" must be a string at least 1 character long!';
-  }
-  if (typeof code != 'string' || code.length < 10) {
-    throw shipData.properties.name + ' build "' + name + '" is not valid!';
-  }
-  try {
-    let ship = new Ship(shipId, shipData.properties, shipData.slots);
-    ship.buildFrom(code);
-  } catch (e) {
-    throw shipData.properties.name + ' build "' + name + '" is not valid!';
-  }
-}
-
-/**
- * Convert a ship-loadout JSON object to a Coriolis build
- * @param  {Object} detailedBuild ship-loadout
- * @return {Object}               Coriolis build
- */
-function detailedJsonToBuild(detailedBuild) {
-  let ship;
-  if (!detailedBuild.name) {
-    throw 'Build Name missing!';
-  }
-
-  if (!detailedBuild.name.trim()) {
-    throw 'Build Name must be a string at least 1 character long!';
-  }
-
-  try {
-    ship = fromDetailedBuild(detailedBuild);
-  } catch (e) {
-    throw detailedBuild.ship + ' Build "' + detailedBuild.name + '": Invalid data';
-  }
-
-  // Never leave the Planetary Approach Suite slot empty on import
-  ModuleUtils.fitDefaultPlanetaryApproachSuite(ship);
-
-  return { shipId: ship.id, name: detailedBuild.name, code: ship.toString() };
-}
-
 /**
  * Import Modal
  */
@@ -182,10 +124,7 @@ export default class ModalImport extends TranslatedComponent {
 
     this._process = this._process.bind(this);
     this._import = this._import.bind(this);
-    this._importBackup = this._importBackup.bind(this);
     this._importLoadout = this._importLoadout.bind(this);
-    this._importDetailedArray = this._importDetailedArray.bind(this);
-    this._importCompanionApiBuild = this._importCompanionApiBuild.bind(this);
     this._validateImport = this._validateImport.bind(this);
   }
 
@@ -218,78 +157,6 @@ export default class ModalImport extends TranslatedComponent {
     this.setState({ builds, singleBuild: true });
   }
 
-  /**
-   * Import a Coriolis backup
-   * @param  {Object} importData Backup Data
-   * @throws {string} If import fails
-   */
-  _importBackup(importData) {
-    if (importData.builds && typeof importData.builds == 'object') {
-      for (let shipId in importData.builds) {
-        for (let buildName in importData.builds[shipId]) {
-          try {
-            validateBuild(shipId, importData.builds[shipId][buildName], buildName);
-          } catch (err) {
-            delete importData.builds[shipId][buildName];
-          }
-        }
-      }
-      this.setState({ builds: importData.builds });
-    } else {
-      throw 'builds must be an object!';
-    }
-    if (importData.comparisons) {
-      for (let compName in importData.comparisons) {
-        let comparison = importData.comparisons[compName];
-        for (let i = 0, l = comparison.builds.length; i < l; i++) {
-          let build = comparison.builds[i];
-          if (!importData.builds[build.shipId] || !importData.builds[build.shipId][build.buildName]) {
-            throw build.shipId + ' build "' + build.buildName + '" data is missing!';
-          }
-        }
-      }
-      this.setState({ comparisons: importData.comparisons });
-    }
-    // Check for old/deprecated discounts
-    if (importData.discounts instanceof Array && importData.discounts.length == 2) {
-      this.setState({ shipDiscount: importData.discounts[0], moduleDiscount: importData.discounts[1] });
-    }
-    // Check for ship discount
-    if (!isNaN(importData.shipDiscount)) {
-      this.setState({ shipDiscount: importData.shipDiscount * 1 });
-    }
-    // Check for module discount
-    if (!isNaN(importData.moduleDiscount)) {
-      this.setState({ moduleDiscount: importData.moduleDiscount * 1 });
-    }
-
-    if (typeof importData.insurance == 'string') {
-      let insurance = importData.insurance.toLowerCase();
-
-      if (Insurance[insurance] !== undefined) {
-        this.setState({ insurance });
-      } else {
-        throw 'Invalid insurance type: ' + insurance;
-      }
-    }
-  }
-
-  /**
-   * Import an array of ship-loadout objects / builds
-   * @param  {Array} importArr  Array of ship-loadout JSON Schema builds
-   */
-  _importDetailedArray(importArr) {
-    let builds = {};
-    for (let i = 0, l = importArr.length; i < l; i++) {
-      let build = detailedJsonToBuild(importArr[i]);
-      if (!builds[build.shipId]) {
-        builds[build.shipId] = {};
-      }
-      builds[build.shipId][build.name] = build.code;
-    }
-    this.setState({ builds });
-  }
-
 
 
   /**
@@ -298,8 +165,9 @@ export default class ModalImport extends TranslatedComponent {
    * @throws {string} If validation fails
    */
   _validateImport(event) {
-    let importData = null;
-    let importString = event.target.value.trim();
+    const importString = event.target.value.trim();
+    if (!importString) return;
+
     this.setState({
       builds: null,
       comparisons: null,
@@ -309,18 +177,14 @@ export default class ModalImport extends TranslatedComponent {
       importValid: false,
       insurance: null,
       singleBuild: false,
-      importString,
+      importString: importString,
     });
-
-    if (!importString) {
-      return;
-    }
 
     try {
       if (dataFormats.isEdsyTextFormat(importString)) { // EDSY Text ?
         this.setState(shipFromEdsyText(importString));
       } else { // Assume the data is JSON
-        importData = JSON.parse(importString);
+        const importData = JSON.parse(importString);
         if (!importData || typeof importData !== 'object') {
           const errorString = 'Parsed JSON must be an object or array!';
           console.log(errorString);
@@ -346,20 +210,15 @@ export default class ModalImport extends TranslatedComponent {
 
         // Coriolis formats
         if (dataFormats.isCoriolisDetailedExportFormat(importData)) {
-          this._importDetailedArray(importData);
-          this.setState({ importValid: true });
+          this.setState(shipFromCoriolisDetailedFormat(importData));
           return;
         }
-
         if (dataFormats.isCoriolisSingleShipFormat(importData)) {
-          this._importDetailedArray([importData]); // Convert to array with single object
-          this.setState({ importValid: true, singleBuild: true });
+          this.setState(shipFromCoriolisSingleShipFormat(importData));
           return;
         }
-
         if (dataFormats.isCoriolisFullBackupFormat(importData)) {
-          this._importBackup(importData);
-          this.setState({ importValid: true });
+          this.setState(backupFromCoriolisFullBackupFormat(importData));
           return;
         }
 
