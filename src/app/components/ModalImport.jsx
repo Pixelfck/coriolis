@@ -547,6 +547,7 @@ export default class ModalImport extends TranslatedComponent {
     if (!state.processed) {
       importStage = (
         <div>
+          <div class={'imprt_text'} dangerouslySetInnerHTML={{ __html: translate('IMPORT_TEXT') }} />
           <textarea spellCheck={false} className='cb json' ref={node => this.importField = node} onChange={this._validateImport} defaultValue={this.state.importString} placeholder={translate('PHRASE_IMPORT')} />
           <button id='proceed' className='l cap' onClick={this._process} disabled={!state.importValid} >{translate('proceed')}</button>
           <div className='l warning' style={{ marginLeft:'3em' }}>{state.errorMsg}</div>
