@@ -536,7 +536,7 @@ export default class Header extends TranslatedComponent {
         <hr />
         <ul style={{ width: '100%' }}>
           {translate('builds')} & {translate('comparisons')}
-          <li><Link href="#" className='block' onClick={this._showBackup.bind(this)}>{translate('backup')}</Link></li>
+          <li><Link href="#" className='block' onClick={this._showBackup.bind(this)}>{translate('full backup')}</Link></li>
           <li><Link href="#" className='block' onClick={this._showDetailedExport.bind(this)}>{translate('detailed export')}</Link></li>
           <li><Link href="#" className='block' onClick={this._showImport.bind(this)}>{translate('import')}</Link></li>
           <li><Link href="#" className='block' onClick={this._showDeleteAll.bind(this)}>{translate('delete all')}</Link></li>
