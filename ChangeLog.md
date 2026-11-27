@@ -188,7 +188,7 @@
 
 #2.3.2
   * Use scan range for DSS rather than scan time
-  * Fix companion API import of Dolphin
+  * Fix Companion API import of Dolphin
   * Use coriolis-data 2.3.2:
     * Separate scan time and scan range
     * Add Frontier IDs for new items in 2.3
@@ -457,5 +457,5 @@
   * Enable boost display even if power distributor is disabled
   * Calculate breakdown of ship offensive and defensive stats
   * Add 'Offence summary' and 'Defence summary' components
-  * Add ability to import from companion API output through import feature
-  * Add ability to import from companion API output through URL
+  * Add ability to import from Companion API output through import feature
+  * Add ability to import from Companion API output through URL

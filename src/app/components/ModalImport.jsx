@@ -226,8 +226,8 @@ export default class ModalImport extends TranslatedComponent {
   }
 
   /**
-   * Import a build direct from the companion API
-   * @param  {string} build JSON from the companion API information
+   * Import a build direct from the Companion API
+   * @param  {string} build JSON from the Companion API information
    * @throws {string} if parse/import fails
    */
   _importCompanionApiBuild(build) {
@@ -401,9 +401,9 @@ export default class ModalImport extends TranslatedComponent {
 
         if (importData?.[0]?.header?.appName) { // has SLEF envelope?
           this._importSlefBuilds(importData);
-        } else if (importData.modules != null && importData.modules.Armour != null) { // Only the companion API has this information
+        } else if (importData.modules != null && importData.modules.Armour != null) { // Only the Companion API has this information
           this._importCompanionApiBuild(importData); // Single ship definition
-        } else if (importData.ship != null && importData.ship.modules != null && importData.ship.modules.Armour != null) { // Only the companion API has this information
+        } else if (importData.ship != null && importData.ship.modules != null && importData.ship.modules.Armour != null) { // Only the Companion API has this information
           this._importCompanionApiBuild(importData.ship); // Complete API dump
         } else if (importData instanceof Array) {   // Must be detailed export json
           this._importDetailedArray(importData);

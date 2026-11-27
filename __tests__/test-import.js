@@ -308,7 +308,7 @@ describe('Import Modal', function() {
 
     beforeEach(reset);
 
-    it('imports a valid companion API build (Federal Corvette)', function() {
+    it('imports a valid Companion API build (Federal Corvette)', function() {
       const importData = require('./fixtures/companion-api-import-1');
       pasteText(JSON.stringify(importData));
 
@@ -320,7 +320,7 @@ describe('Import Modal', function() {
       expect(Router.go.mock.calls[0][0]).toBe('/outfit/federal_corvette?code=B2putsFklndzsxf50x0x7l28281919040404040402020l06p05sf63c5ifr--v66g--4C.AwRj4zNarI%3D%3D.CwRgDBldUExuBiIlQoA%3D.&bn=Imported%20Federal%20Corvette');
     });
 
-    it('imports a valid companion API build (Beluga)', function() {
+    it('imports a valid Companion API build (Beluga)', function() {
       const importData = require('./fixtures/companion-api-import-2');
       pasteText(JSON.stringify(importData));
 
@@ -332,7 +332,7 @@ describe('Import Modal', function() {
       expect(Router.go.mock.calls[0][0]).toBe('/outfit/beluga?code=B0pktsFplCdpsnf70t0t2727270004040404043c4fmimlmm04mc0iv62i--4C.AwRj4yu8g%3D%3D%3D.CwRgDBldHi8IWEQ%3D.&bn=Imported%20Beluga%20Liner');
     });
 
-    it('imports a valid companion API build (Type-7)', function() {
+    it('imports a valid Companion API build (Type-7)', function() {
       const importData = require('./fixtures/companion-api-import-3');
       pasteText(JSON.stringify(importData));
 
@@ -344,7 +344,7 @@ describe('Import Modal', function() {
       expect(Router.go.mock.calls[0][0]).toBe('/outfit/type_7_transport?code=B0patfFflidasdf5----04040400--05050504044d2402--4C.AwRj4yuo.CwRgDBldYncXLIA%3D.&bn=Imported%20Type-7%20Transporter');
     });
 
-    it('imports a valid companion API build (Cobra Mk III)', function() {
+    it('imports a valid Companion API build (Cobra Mk III)', function() {
       const importData = require('./fixtures/companion-api-import-4');
       pasteText(JSON.stringify(importData));
 

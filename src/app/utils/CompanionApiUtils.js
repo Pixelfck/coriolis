@@ -161,7 +161,7 @@ export function shipSlots(shipId, group) {
   return (s && s[group]) ? s[group] : null;
 }
 
-// Mapping from hardpoint class to name in companion API
+// Mapping from hardpoint class to name in Companion API
 export const HARDPOINT_NUM_TO_CLASS = {
   0: "Tiny",
   1: "Small",
@@ -250,8 +250,8 @@ function _shipModelFromEDName(edName) {
 }
 
 /**
- * Obtain a ship's model from the companion API JSON
- * @param {object} json the companion API JSON
+ * Obtain a ship's model from the Companion API JSON
+ * @param {object} json the Companion API JSON
  * @return {string} the Coriolis model of the ship
  */
 export function shipModelFromJson(json) {
@@ -264,8 +264,8 @@ export function shipModelFromJson(json) {
 }
 
 /**
- * Build a ship from the companion API JSON
- * @param {object} json the companion API JSON
+ * Build a ship from the Companion API JSON
+ * @param {object} json the Companion API JSON
  * @return {Ship} the built ship
  */
 export function shipFromJson(json) {
