@@ -15,6 +15,7 @@ import { shipFromJson, shipModelFromJson } from '../utils/CompanionApiUtils';
 import { shipFromLoadoutJSON } from '../utils/JournalUtils';
 import { shipFromEdsyText } from '../utils/ImportFormatsEDSY';
 import { shipFromInaraSlef } from "../utils/ImportFormatsInara";
+import { shipFromCompanionApi } from "../utils/ImportFormatsCompanionApi";
 
 
 
@@ -289,21 +290,6 @@ export default class ModalImport extends TranslatedComponent {
     this.setState({ builds });
   }
 
-  /**
-   * Import a build direct from the Companion API
-   * @param  {string} build JSON from the Companion API information
-   * @throws {string} if parse/import fails
-   */
-  _importCompanionApiBuild(build) {
-    const shipModel = shipModelFromJson(build);
-    const ship = shipFromJson(build);
-
-    let builds = {};
-    builds[shipModel] = {};
-    builds[shipModel]['Imported ' + Ships[shipModel].properties.name] = ship.toString();
-    this.setState({ builds, singleBuild: true });
-  }
-
 
 
   /**
@@ -350,14 +336,11 @@ export default class ModalImport extends TranslatedComponent {
 
         // Companion API formats
         if (dataFormats.isCompanionApiSingleShipFormat(importData)) {
-          this._importCompanionApiBuild(importData); // Single ship definition
-          this.setState({ importValid: true, singleBuild: true });
+          this.setState(shipFromCompanionApi(importData)); // Single ship definition
           return;
         }
-
         if (dataFormats.isCompanionApiFullDataFormat(importData)) {
-          this._importCompanionApiBuild(importData.ship); // Complete API dump
-          this.setState({ importValid: true });
+          this.setState(shipFromCompanionApi(importData.ship)); // Complete API dump
           return;
         }
 
